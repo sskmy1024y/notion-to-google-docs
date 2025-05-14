@@ -22,12 +22,16 @@ export class NotionService {
       // Get page title
       const title = this.extractPageTitle(page);
       
+      // Extract page properties
+      const properties = this.extractPageProperties(page);
+      
       // Get page blocks
       const blocks = await this.getPageBlocks(pageId);
       
       return {
         id: pageId,
         title,
+        properties,
         blocks,
       };
     } catch (error) {
@@ -101,5 +105,138 @@ export class NotionService {
     }
     
     return blocksWithChildren;
+  }
+
+  /**
+   * Extract properties from a Notion page
+   */
+  private extractPageProperties(page: any): any[] {
+    const properties = page.properties || {};
+    const result = [];
+    
+    for (const key in properties) {
+      const prop = properties[key];
+      if (!prop || !prop.type) continue;
+      
+      const propertyData = {
+        id: prop.id,
+        name: key,
+        type: prop.type,
+        value: this.extractPropertyValue(prop)
+      };
+      
+      result.push(propertyData);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Extract the value from a Notion property based on its type
+   */
+  private extractPropertyValue(property: any): any {
+    const { type } = property;
+    
+    switch (type) {
+      case 'title':
+        return property.title?.map((t: any) => t.plain_text).join('') || '';
+        
+      case 'rich_text':
+        return property.rich_text?.map((t: any) => t.plain_text).join('') || '';
+        
+      case 'number':
+        return property.number;
+        
+      case 'select':
+        return property.select?.name || '';
+        
+      case 'multi_select':
+        return property.multi_select?.map((s: any) => s.name).join(', ') || '';
+        
+      case 'date':
+        return property.date?.start || '';
+        
+      case 'people':
+        return property.people?.map((p: any) => p.name || p.id).join(', ') || '';
+        
+      case 'files':
+        return property.files?.map((f: any) => f.name || f.external?.url || '').join(', ') || '';
+        
+      case 'checkbox':
+        return property.checkbox;
+        
+      case 'url':
+        return property.url || '';
+        
+      case 'email':
+        return property.email || '';
+        
+      case 'phone_number':
+        return property.phone_number || '';
+        
+      case 'formula':
+        return this.extractFormulaValue(property.formula);
+        
+      case 'relation':
+        return property.relation?.map((r: any) => r.id).join(', ') || '';
+        
+      case 'rollup':
+        return this.extractRollupValue(property.rollup);
+        
+      case 'created_time':
+        return property.created_time || '';
+        
+      case 'created_by':
+        return property.created_by?.name || property.created_by?.id || '';
+        
+      case 'last_edited_time':
+        return property.last_edited_time || '';
+        
+      case 'last_edited_by':
+        return property.last_edited_by?.name || property.last_edited_by?.id || '';
+        
+      default:
+        return JSON.stringify(property);
+    }
+  }
+
+  /**
+   * Extract value from a formula property
+   */
+  private extractFormulaValue(formula: any): any {
+    if (!formula) return '';
+    
+    const { type } = formula;
+    switch (type) {
+      case 'string':
+        return formula.string || '';
+      case 'number':
+        return formula.number;
+      case 'boolean':
+        return formula.boolean;
+      case 'date':
+        return formula.date?.start || '';
+      default:
+        return '';
+    }
+  }
+
+  /**
+   * Extract value from a rollup property
+   */
+  private extractRollupValue(rollup: any): any {
+    if (!rollup) return '';
+    
+    const { type } = rollup;
+    switch (type) {
+      case 'number':
+        return rollup.number;
+      case 'date':
+        return rollup.date?.start || '';
+      case 'array':
+        return rollup.array?.map((item: any) => JSON.stringify(item)).join(', ') || '';
+      default:
+        return '';
+    }
   }
 }

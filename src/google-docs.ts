@@ -79,21 +79,27 @@ export class GoogleDocsService {
         const endIndex = document.data.body.content[document.data.body.content.length - 1].endIndex;
         
         if (endIndex && endIndex > 1) {
-          await this.docs.documents.batchUpdate({
-            documentId: docId,
-            requestBody: {
-              requests: [
-                {
-                  deleteContentRange: {
-                    range: {
-                      startIndex: 1,
-                      endIndex: endIndex - 1
+          // Make sure the range is not empty
+          const startIndex = 1;
+          const safeEndIndex = endIndex - 1;
+          
+          if (safeEndIndex > startIndex) {
+            await this.docs.documents.batchUpdate({
+              documentId: docId,
+              requestBody: {
+                requests: [
+                  {
+                    deleteContentRange: {
+                      range: {
+                        startIndex: startIndex,
+                        endIndex: safeEndIndex
+                      }
                     }
                   }
-                }
-              ]
-            }
-          });
+                ]
+              }
+            });
+          }
         }
       }
     } catch (error) {
@@ -132,8 +138,25 @@ export class GoogleDocsService {
       }
     );
     
-    // Process blocks
     let currentIndex = notionPage.title.length + 3; // +3 for title and two newlines
+    
+    // Add properties table if there are properties
+    if (notionPage.properties && notionPage.properties.length > 0) {
+      const propertiesRequests = this.createPropertiesTable(notionPage.properties, currentIndex);
+      requests.push(...propertiesRequests.requests);
+      currentIndex += propertiesRequests.textLength;
+      
+      // Add a newline after the table
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: '\n'
+        }
+      });
+      currentIndex += 1;
+    }
+    
+    // Process blocks
     
     for (const block of notionPage.blocks) {
       const blockRequests = this.processBlock(block, currentIndex);
@@ -414,5 +437,102 @@ export class GoogleDocsService {
     }
     
     return richText.map(text => text.plain_text || '').join('');
+  }
+
+  /**
+   * Create a table for Notion page properties
+   */
+  private createPropertiesTable(properties: any[], startIndex: number): { requests: any[], textLength: number } {
+    const requests: any[] = [];
+    let textLength = 0;
+    
+    // Add a heading for the properties section
+    const propertiesHeading = 'Page Properties';
+    requests.push(
+      {
+        insertText: {
+          location: { index: startIndex },
+          text: propertiesHeading + '\n'
+        }
+      },
+      {
+        updateParagraphStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + propertiesHeading.length
+          },
+          paragraphStyle: {
+            namedStyleType: 'HEADING_2'
+          },
+          fields: 'namedStyleType'
+        }
+      }
+    );
+    
+    textLength += propertiesHeading.length + 1; // +1 for newline
+    const tableStartIndex = startIndex + textLength;
+    
+    // Filter out title property and prepare property data
+    const filteredProperties = properties.filter(prop => prop.type !== 'title');
+    
+    // If we have no properties to display (only title), return empty requests
+    if (filteredProperties.length === 0) {
+      return { requests: [], textLength: 0 };
+    }
+    
+    // Create a simple text representation of the properties
+    let propertiesText = '';
+    
+    // Calculate column widths for better formatting
+    const maxNameLength = Math.max(
+      'Property Name'.length,
+      ...filteredProperties.map(prop => prop.name.length)
+    );
+    const maxTypeLength = Math.max(
+      'Property Type'.length,
+      ...filteredProperties.map(prop => prop.type.length)
+    );
+    
+    // Create header row with padding
+    const namePadding = ' '.repeat(Math.max(0, maxNameLength - 'Property Name'.length + 2));
+    const typePadding = ' '.repeat(Math.max(0, maxTypeLength - 'Property Type'.length + 2));
+    propertiesText += `Property Name${namePadding}| Property Type${typePadding}| Value\n`;
+    
+    // Create separator row
+    const nameHyphens = '-'.repeat(maxNameLength + 2);
+    const typeHyphens = '-'.repeat(maxTypeLength + 2);
+    const valueHyphens = '-'.repeat(10); // Arbitrary width for value column
+    propertiesText += `${nameHyphens}|${typeHyphens}|${valueHyphens}\n`;
+    
+    // Add property rows
+    for (const prop of filteredProperties) {
+      // Format the value as a string
+      let valueStr = '';
+      if (prop.value === null || prop.value === undefined) {
+        valueStr = '';
+      } else if (typeof prop.value === 'boolean') {
+        valueStr = prop.value ? 'Yes' : 'No';
+      } else {
+        valueStr = String(prop.value);
+      }
+      
+      // Add padding for alignment
+      const namePadding = ' '.repeat(Math.max(0, maxNameLength - prop.name.length + 2));
+      const typePadding = ' '.repeat(Math.max(0, maxTypeLength - prop.type.length + 2));
+      
+      propertiesText += `${prop.name}${namePadding}| ${prop.type}${typePadding}| ${valueStr}\n`;
+    }
+    
+    // Insert the properties as a simple text table
+    requests.push({
+      insertText: {
+        location: { index: tableStartIndex },
+        text: propertiesText
+      }
+    });
+    
+    textLength += propertiesText.length;
+    
+    return { requests, textLength };
   }
 }

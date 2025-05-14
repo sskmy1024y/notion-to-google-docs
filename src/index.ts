@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 
+console.log('Script starting...');
+
 import { validateConfig, NOTION_PAGE_ID, GOOGLE_DOC_ID } from './config';
 import { NotionService } from './notion';
 import { GoogleDocsService } from './google-docs';

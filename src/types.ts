@@ -5,9 +5,17 @@ export interface NotionBlock {
   [key: string]: any;
 }
 
+export interface NotionPageProperty {
+  id: string;
+  name: string;
+  type: string;
+  value: any;
+}
+
 export interface NotionPage {
   id: string;
   title: string;
+  properties: NotionPageProperty[];
   blocks: NotionBlock[];
 }
 
