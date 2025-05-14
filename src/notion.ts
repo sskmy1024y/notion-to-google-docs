@@ -40,14 +40,15 @@ export class NotionService {
    * Extract the title from a Notion page
    */
   private extractPageTitle(page: any): string {
-    // Title is usually in the properties.title or properties.Name field
-    const titleProperty = page.properties?.title || page.properties?.Name;
-    
-    if (titleProperty?.title && Array.isArray(titleProperty.title)) {
-      return titleProperty.title.map((t: any) => t.plain_text).join('');
+    // Try to find the first property of type 'title'
+    const properties = page.properties || {};
+    for (const key in properties) {
+      const prop = properties[key];
+      if (prop?.type === 'title' && Array.isArray(prop.title)) {
+        return prop.title.map((t: any) => t.plain_text).join('');
+      }
     }
-    
-    // Fallback to page ID if title not found
+    // Fallback to page.id if no title found
     return `Notion Page (${page.id})`;
   }
 
