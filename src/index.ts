@@ -2,10 +2,11 @@
 
 console.log('Script starting...');
 
-import { validateConfig, NOTION_PAGE_ID, GOOGLE_DOC_ID, NEEDS_DYNAMIC_AUTH } from './config';
+import { validateConfig, NOTION_PAGE_ID, NOTION_DATABASE_ID, GOOGLE_DOC_ID, NEEDS_DYNAMIC_AUTH } from './config';
 import { NotionService } from './notion';
 import { GoogleDocsService } from './google-docs';
 import { TransferResult } from './types';
+import { selectNotionPage } from './cli';
 
 /**
  * Main function to transfer content from Notion to Google Docs
@@ -16,8 +17,6 @@ async function transferNotionToGoogleDocs(): Promise<TransferResult> {
     validateConfig();
     
     console.log('Starting transfer from Notion to Google Docs...');
-    console.log(`Notion Page ID: ${NOTION_PAGE_ID}`);
-    console.log(`Google Doc ID: ${GOOGLE_DOC_ID}`);
     
     // Initialize services
     const notionService = new NotionService();
@@ -34,9 +33,28 @@ async function transferNotionToGoogleDocs(): Promise<TransferResult> {
       googleDocsService = new GoogleDocsService();
     }
     
+    // ページIDの取得方法を決定
+    let pageId: string;
+    
+    if (NOTION_DATABASE_ID) {
+      console.log(`Notionデータベース(${NOTION_DATABASE_ID})からページのリストを取得しています...`);
+      const pages = await notionService.getDatabasePages();
+      console.log(`${pages.length}個のページが見つかりました。`);
+      
+      // CLIでページを選択
+      pageId = await selectNotionPage(pages);
+      console.log(`選択されたページID: ${pageId}`);
+    } else {
+      // 環境変数からページIDを使用
+      pageId = NOTION_PAGE_ID;
+      console.log(`Notion Page ID: ${pageId}`);
+    }
+    
+    console.log(`Google Doc ID: ${GOOGLE_DOC_ID}`);
+    
     // Fetch Notion page
     console.log('Fetching Notion page...');
-    const notionPage = await notionService.getPage();
+    const notionPage = await notionService.getPage(pageId);
     console.log(`Fetched Notion page: "${notionPage.title}" with ${notionPage.blocks.length} blocks`);
     
     // Write to Google Docs

@@ -7,6 +7,7 @@ dotenv.config({ path: resolve(process.cwd(), '.env') });
 // Notion configuration
 export const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
 export const NOTION_PAGE_ID = process.env.NOTION_PAGE_ID || '';
+export const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID || '';
 
 // Google API configuration
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -23,11 +24,15 @@ export function validateConfig(): void {
   // 動的認証を使用する場合は、GOOGLE_REFRESH_TOKENが不要
   const requiredVars = [
     { name: 'NOTION_API_KEY', value: NOTION_API_KEY },
-    { name: 'NOTION_PAGE_ID', value: NOTION_PAGE_ID },
     { name: 'GOOGLE_CLIENT_ID', value: GOOGLE_CLIENT_ID },
     { name: 'GOOGLE_CLIENT_SECRET', value: GOOGLE_CLIENT_SECRET },
     { name: 'GOOGLE_DOC_ID', value: GOOGLE_DOC_ID },
   ];
+
+  // データベースモードかページモードどちらか一方が必要
+  if (!NOTION_DATABASE_ID && !NOTION_PAGE_ID) {
+    throw new Error('Either NOTION_DATABASE_ID or NOTION_PAGE_ID must be provided');
+  }
 
   // リフレッシュトークンを使用する場合のみ、GOOGLE_REDIRECT_URIとGOOGLE_REFRESH_TOKENを検証
   if (!NEEDS_DYNAMIC_AUTH) {

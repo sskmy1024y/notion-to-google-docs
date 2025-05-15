@@ -1,6 +1,6 @@
 import { Client } from '@notionhq/client';
-import { NOTION_API_KEY, NOTION_PAGE_ID } from './config';
-import { NotionBlock, NotionPage } from './types';
+import { NOTION_API_KEY, NOTION_PAGE_ID, NOTION_DATABASE_ID } from './config';
+import { NotionBlock, NotionPage, NotionPageListItem } from './types';
 
 export class NotionService {
   private client: Client;
@@ -9,6 +9,44 @@ export class NotionService {
     this.client = new Client({
       auth: NOTION_API_KEY,
     });
+  }
+
+  /**
+   * データベースからページのリストを取得
+   */
+  async getDatabasePages(databaseId: string = NOTION_DATABASE_ID): Promise<NotionPageListItem[]> {
+    try {
+      // データベースのページを取得
+      // Notionの内部APIではlast_edited_timeの直接指定が動作しないため、ソートを指定しない
+      const response = await this.client.databases.query({
+        database_id: databaseId,
+      });
+
+      // ページの基本情報を抽出
+      const pages = response.results.map((page: any) => {
+        // タイトルを取得（データベースの主キーになっているプロパティを探す）
+        const title = this.extractPageTitle(page);
+        
+        return {
+          id: page.id,
+          title,
+          lastEditedTime: page.last_edited_time,
+          createdTime: page.created_time,
+          url: page.url,
+        };
+      });
+
+      // JavaScriptレベルでページを最終更新日時でソート
+      pages.sort((a, b) => {
+        if (!a.lastEditedTime || !b.lastEditedTime) return 0;
+        return new Date(b.lastEditedTime).getTime() - new Date(a.lastEditedTime).getTime();
+      });
+
+      return pages;
+    } catch (error) {
+      console.error('Error fetching database pages:', error);
+      throw error;
+    }
   }
 
   /**

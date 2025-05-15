@@ -19,6 +19,14 @@ export interface NotionPage {
   blocks: NotionBlock[];
 }
 
+export interface NotionPageListItem {
+  id: string;
+  title: string;
+  lastEditedTime?: string;
+  createdTime?: string;
+  url?: string;
+}
+
 // Google Docs types
 export interface GoogleDocsRequest {
   documentId: string;
