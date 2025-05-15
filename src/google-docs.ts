@@ -48,11 +48,44 @@ export class GoogleDocsService {
    */
   async writeToDoc(notionPage: NotionPage, docId: string = GOOGLE_DOC_ID): Promise<GoogleDocsResponse> {
     try {
-      // Clear the document first
-      await this.clearDocument(docId);
+      // ドキュメントの情報を取得して、末尾のインデックスを特定
+      const document = await this.docs.documents.get({
+        documentId: docId
+      });
+      
+      // ドキュメントが空でない場合は改ページを追加するためのインデックスを取得
+      let startIndex = 1; // デフォルトは先頭（空のドキュメントの場合）
+      
+      if (document.data.body?.content && document.data.body.content.length > 1) {
+        const lastContentElement = document.data.body.content[document.data.body.content.length - 1];
+        if (lastContentElement.endIndex) {
+          startIndex = lastContentElement.endIndex - 1;
+          
+          // 空のドキュメントでない場合は改ページを追加
+          if (startIndex > 1) {
+            await this.docs.documents.batchUpdate({
+              documentId: docId,
+              requestBody: {
+                requests: [
+                  {
+                    insertPageBreak: {
+                      location: {
+                        index: startIndex
+                      }
+                    }
+                  }
+                ]
+              }
+            });
+            
+            // 改ページ追加後に開始位置を更新
+            startIndex += 1;
+          }
+        }
+      }
       
       // Convert Notion blocks to Google Docs requests
-      const requests = this.convertNotionToGoogleDocs(notionPage);
+      const requests = this.convertNotionToGoogleDocs(notionPage, startIndex);
       
       // Write to Google Doc
       const response = await this.docs.documents.batchUpdate({
@@ -126,7 +159,7 @@ export class GoogleDocsService {
   /**
    * Convert Notion blocks to Google Docs API requests
    */
-  private convertNotionToGoogleDocs(notionPage: NotionPage): any[] {
+  private convertNotionToGoogleDocs(notionPage: NotionPage, startIndex: number): any[] {
     const requests: any[] = [];
     
     // Add title
@@ -134,7 +167,7 @@ export class GoogleDocsService {
       {
         insertText: {
           location: {
-            index: 1
+            index: startIndex
           },
           text: notionPage.title + '\n\n'
         }
@@ -142,8 +175,8 @@ export class GoogleDocsService {
       {
         updateParagraphStyle: {
           range: {
-            startIndex: 1,
-            endIndex: notionPage.title.length + 1
+            startIndex: startIndex,
+            endIndex: startIndex + notionPage.title.length
           },
           paragraphStyle: {
             namedStyleType: 'TITLE'
@@ -153,7 +186,7 @@ export class GoogleDocsService {
       }
     );
     
-    let currentIndex = notionPage.title.length + 3; // +3 for title and two newlines
+    let currentIndex = startIndex + notionPage.title.length + 2; // +2 for title and newline
     
     // Add properties table if there are properties
     if (notionPage.properties && notionPage.properties.length > 0) {

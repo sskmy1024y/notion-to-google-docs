@@ -49,3 +49,11 @@ export interface TransferResult {
   googleDocId?: string;
   error?: Error;
 }
+
+export interface MultiTransferResult {
+  success: boolean;
+  message: string;
+  results: TransferResult[];
+  failedCount: number;
+  successCount: number;
+}
