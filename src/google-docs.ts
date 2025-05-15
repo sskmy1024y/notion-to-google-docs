@@ -169,7 +169,7 @@ export class GoogleDocsService {
           location: {
             index: startIndex
           },
-          text: notionPage.title + '\n\n'
+          text: notionPage.title + '\n'
         }
       },
       {
@@ -186,7 +186,56 @@ export class GoogleDocsService {
       }
     );
     
-    let currentIndex = startIndex + notionPage.title.length + 2; // +2 for title and newline
+    // ページIDをタイトルの後に追加
+    const pageIdText = `Notion Page ID: ${notionPage.id}\n`;
+    const pageIdStartIndex = startIndex + notionPage.title.length + 1; // +1 for title newline
+    
+    requests.push(
+      {
+        insertText: {
+          location: {
+            index: pageIdStartIndex
+          },
+          text: pageIdText
+        }
+      },
+      {
+        updateTextStyle: {
+          range: {
+            startIndex: pageIdStartIndex,
+            endIndex: pageIdStartIndex + pageIdText.length - 1 // -1 to exclude newline from style
+          },
+          textStyle: {
+            fontSize: {
+              magnitude: 8,
+              unit: 'PT'
+            },
+            foregroundColor: {
+              color: {
+                rgbColor: {
+                  red: 0.5,
+                  green: 0.5,
+                  blue: 0.5
+                }
+              }
+            }
+          },
+          fields: 'fontSize,foregroundColor'
+        }
+      }
+    );
+    
+    let currentIndex = pageIdStartIndex + pageIdText.length + 1; // +1 for extra newline
+    
+    // 追加の改行を入れる
+    requests.push({
+      insertText: {
+        location: { 
+          index: pageIdStartIndex + pageIdText.length 
+        },
+        text: '\n'
+      }
+    });
     
     // Add properties table if there are properties
     if (notionPage.properties && notionPage.properties.length > 0) {
