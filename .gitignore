@@ -8,6 +8,9 @@ dist/
 # Environment variables
 .env
 
+# Google認証情報
+google-credentials.json
+
 # Logs
 *.log
 npm-debug.log*

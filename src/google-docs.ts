@@ -7,25 +7,40 @@ import {
   GOOGLE_DOC_ID
 } from './config';
 import { NotionBlock, NotionPage, GoogleDocsRequest, GoogleDocsResponse } from './types';
+import { createOAuth2Client, getGoogleAuthCredentials } from './google-auth';
 
 export class GoogleDocsService {
   private docs: docs_v1.Docs;
 
-  constructor() {
-    // Set up OAuth2 client
-    const oauth2Client = new google.auth.OAuth2(
+  constructor(oauth2Client?: any) {
+    // 既存のoauth2Clientが提供された場合はそれを使用
+    if (oauth2Client) {
+      this.docs = google.docs({ version: 'v1', auth: oauth2Client });
+      return;
+    }
+
+    // 提供されていない場合は、静的な認証情報を使用
+    const client = new google.auth.OAuth2(
       GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET,
       GOOGLE_REDIRECT_URI
     );
 
     // Set credentials using refresh token
-    oauth2Client.setCredentials({
+    client.setCredentials({
       refresh_token: GOOGLE_REFRESH_TOKEN
     });
 
     // Create Google Docs client
-    this.docs = google.docs({ version: 'v1', auth: oauth2Client });
+    this.docs = google.docs({ version: 'v1', auth: client });
+  }
+
+  /**
+   * 動的な認証を使用してGoogleDocsServiceのインスタンスを作成
+   */
+  static async createWithDynamicAuth(): Promise<GoogleDocsService> {
+    const { oauth2Client } = await getGoogleAuthCredentials();
+    return new GoogleDocsService(oauth2Client);
   }
 
   /**

@@ -2,7 +2,7 @@
 
 console.log('Script starting...');
 
-import { validateConfig, NOTION_PAGE_ID, GOOGLE_DOC_ID } from './config';
+import { validateConfig, NOTION_PAGE_ID, GOOGLE_DOC_ID, NEEDS_DYNAMIC_AUTH } from './config';
 import { NotionService } from './notion';
 import { GoogleDocsService } from './google-docs';
 import { TransferResult } from './types';
@@ -21,7 +21,18 @@ async function transferNotionToGoogleDocs(): Promise<TransferResult> {
     
     // Initialize services
     const notionService = new NotionService();
-    const googleDocsService = new GoogleDocsService();
+    
+    // GoogleDocsServiceの初期化方法を決定
+    let googleDocsService;
+    if (NEEDS_DYNAMIC_AUTH) {
+      console.log('リフレッシュトークンが見つかりません。動的認証を開始します...');
+      // 動的認証でGoogleDocsServiceを作成
+      googleDocsService = await GoogleDocsService.createWithDynamicAuth();
+      console.log('動的認証が完了しました。');
+    } else {
+      // 既存の静的認証情報でGoogleDocsServiceを作成
+      googleDocsService = new GoogleDocsService();
+    }
     
     // Fetch Notion page
     console.log('Fetching Notion page...');

@@ -69,17 +69,21 @@ GOOGLE_DOC_ID=your_google_doc_id
 
 ### Getting Google API Credentials
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project
-3. Enable the Google Docs API
-4. Create OAuth 2.0 credentials (client ID and client secret)
-5. Set up the OAuth consent screen
-6. Use the OAuth 2.0 Playground to get a refresh token:
-   - Go to [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/)
-   - Set up the OAuth 2.0 Playground to use your client ID and client secret
-   - Select the Google Docs API scope: `https://www.googleapis.com/auth/documents`
-   - Exchange the authorization code for tokens
-   - Copy the refresh token
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project
+2. Enable the Google Docs API
+3. Create OAuth 2.0 Client ID credentials
+   - Application type: Select "Web application"
+   - Add `http://localhost:3000/oauth2callback` to the list of authorized redirect URIs
+4. Set up the OAuth consent screen
+   - At minimum, you need to provide an app name and a user support email
+   - Add your email address as a test user
+5. Add the created client ID and client secret to your `.env` file as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+6. About the refresh token:
+   - In the latest version, authentication happens automatically on first run
+   - When you run the application, a browser will automatically open with the Google login screen
+   - After login, the credentials will be saved to `google-credentials.json` and reused for subsequent runs
+
+Note: Previous versions required manually obtaining a refresh token using the OAuth 2.0 Playground, but this is no longer necessary.
 
 ## Usage
 
