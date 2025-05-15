@@ -1,5 +1,5 @@
 import { Client } from '@notionhq/client';
-import { NOTION_API_KEY, NOTION_PAGE_ID, NOTION_DATABASE_ID } from './config';
+import { NOTION_API_KEY, NOTION_DATABASE_ID } from './config';
 import { NotionBlock, NotionPage, NotionPageListItem } from './types';
 
 export class NotionService {
@@ -52,7 +52,7 @@ export class NotionService {
   /**
    * Fetch a page from Notion by ID
    */
-  async getPage(pageId: string = NOTION_PAGE_ID): Promise<NotionPage> {
+  async getPage(pageId: string): Promise<NotionPage> {
     try {
       // Get page metadata
       const page = await this.client.pages.retrieve({ page_id: pageId });

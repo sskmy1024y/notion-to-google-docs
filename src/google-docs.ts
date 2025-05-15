@@ -2,12 +2,11 @@ import { google, docs_v1 } from 'googleapis';
 import {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
-  GOOGLE_REDIRECT_URI,
-  GOOGLE_REFRESH_TOKEN,
   GOOGLE_DOC_ID
 } from './config';
 import { NotionBlock, NotionPage, GoogleDocsRequest, GoogleDocsResponse } from './types';
 import { createOAuth2Client, getGoogleAuthCredentials } from './google-auth';
+import { start } from 'repl';
 
 export class GoogleDocsService {
   private docs: docs_v1.Docs;
@@ -23,13 +22,7 @@ export class GoogleDocsService {
     const client = new google.auth.OAuth2(
       GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET,
-      GOOGLE_REDIRECT_URI
     );
-
-    // Set credentials using refresh token
-    client.setCredentials({
-      refresh_token: GOOGLE_REFRESH_TOKEN
-    });
 
     // Create Google Docs client
     this.docs = google.docs({ version: 'v1', auth: client });
@@ -45,13 +38,70 @@ export class GoogleDocsService {
 
   /**
    * Write Notion page content to a Google Doc
+   * 同じNotionページIDが既に存在する場合は更新、存在しない場合は新規追加
    */
   async writeToDoc(notionPage: NotionPage, docId: string = GOOGLE_DOC_ID): Promise<GoogleDocsResponse> {
     try {
-      // ドキュメントの情報を取得して、末尾のインデックスを特定
+      // ドキュメントの情報を取得
       const document = await this.docs.documents.get({
         documentId: docId
       });
+      
+      // Notionページが既にドキュメント内に存在するか確認
+      const existingPageLocation = this.findNotionPageInDoc(document, notionPage.id);
+      
+      if (existingPageLocation) {
+        console.log(`既存のNotionページID ${notionPage.id} を発見しました。更新します。`);
+       
+        // const adjustedEndIndex = this.adjustEndIndexForNewline(
+        //   existingPageLocation.startIndex,
+        //   existingPageLocation.endIndex,
+        //   document
+        // );
+
+        // 既存のコンテンツを削除するリクエスト
+        const deleteRequests = this.createDeleteContentRequests(
+          existingPageLocation.startIndex,
+          existingPageLocation.endIndex,
+        );
+        
+        // 既存のコンテンツ削除
+        await this.docs.documents.batchUpdate({
+          documentId: docId,
+          requestBody: { requests: deleteRequests }
+        });
+
+        // スタイルをリセットするリクエストを実行
+        // これにより、周囲のテキストスタイルが新しいコンテンツに影響しなくなる
+        const resetStyleRequests = this.createResetStyleRequest(existingPageLocation.startIndex);
+        await this.docs.documents.batchUpdate({
+          documentId: docId,
+          requestBody: { requests: resetStyleRequests }
+        });
+  
+        // 同じ位置に新しいコンテンツを挿入
+        const insertRequests = this.convertNotionToGoogleDocs(notionPage, existingPageLocation.startIndex);
+        
+        // 更新したコンテンツを書き込む
+        const response = await this.docs.documents.batchUpdate({
+          documentId: docId,
+          requestBody: { requests: insertRequests }
+        });
+        
+        return {
+          documentId: docId,
+          writeControl: response.data.writeControl
+            ? {
+                requiredRevisionId: response.data.writeControl.requiredRevisionId ?? undefined
+              }
+            : undefined,
+          replies: response.data.replies,
+          updated: true // 更新されたことを示すフラグを追加
+        };
+      }
+      
+      // 既存のページが見つからなかった場合は新規追加
+      console.log(`Notionページ ${notionPage.id} は新規追加します。`);
       
       // ドキュメントが空でない場合は改ページを追加するためのインデックスを取得
       let startIndex = 1; // デフォルトは先頭（空のドキュメントの場合）
@@ -80,6 +130,13 @@ export class GoogleDocsService {
             
             // 改ページ追加後に開始位置を更新
             startIndex += 1;
+            
+            // 新規追加の場合もスタイルをリセット
+            const resetStyleRequests = this.createResetStyleRequest(startIndex);
+            await this.docs.documents.batchUpdate({
+              documentId: docId,
+              requestBody: { requests: resetStyleRequests }
+            });
           }
         }
       }
@@ -102,7 +159,8 @@ export class GoogleDocsService {
               requiredRevisionId: response.data.writeControl.requiredRevisionId ?? undefined
             }
           : undefined,
-        replies: response.data.replies
+        replies: response.data.replies,
+        updated: false // 新規追加されたことを示すフラグを追加
       };
     } catch (error) {
       console.error('Error writing to Google Doc:', error);
@@ -631,5 +689,205 @@ export class GoogleDocsService {
     textLength += propertiesText.length;
     
     return { requests, textLength };
+  }
+
+  /**
+   * Google Docsドキュメント内で特定のNotionページIDを検索
+   * @param document Google Docsドキュメント
+   * @param notionPageId 検索するNotionページID
+   * @returns 見つかった場合はページの開始位置と終了位置を含むオブジェクト、見つからない場合はnull
+   */
+  private findNotionPageInDoc(document: any, notionPageId: string): { startIndex: number, endIndex: number } | null {
+    if (!document.data.body?.content) {
+      return null;
+    }
+
+    const content = document.data.body.content;
+    const docText = content
+      .filter((item: any) => item.paragraph && item.paragraph.elements)
+      .flatMap((item: any) => item.paragraph.elements)
+      .filter((element: any) => element.textRun && element.textRun.content)
+      .map((element: any) => element.textRun.content)
+      .join('');
+    
+    // NotionページIDの検索パターン
+    const searchPattern = `Notion Page ID: ${notionPageId}`;
+    const pageIdIndex = docText.indexOf(searchPattern);
+    
+    if (pageIdIndex === -1) {
+      return null;
+    }
+
+    // IDを見つけたら、そのページコンテンツの範囲を特定する
+    let startIndex = 0;
+    let endIndex = 0;
+    
+    // IDの位置を特定し、そこから前方に検索して2つ目の改行文字を見つける
+    let idPosition = 0;
+    let pageTitle = '';
+    let foundIdPosition = false;
+    
+    // まずIDの正確な位置を特定
+    for (let i = 0; i < content.length && !foundIdPosition; i++) {
+      const item = content[i];
+      if (item.paragraph && item.paragraph.elements) {
+        for (const element of item.paragraph.elements) {
+          if (element.textRun && element.textRun.content) {
+            const elemText = element.textRun.content;
+            if (elemText.includes(searchPattern)) {
+              idPosition = item.startIndex || 0;
+              // IDの位置を見つけたら、そこから改行分をスキップ
+              startIndex = Math.max(idPosition - pageTitle.length, 0);
+              foundIdPosition = true;
+              break;
+            } else {
+              pageTitle = elemText;
+            }
+          }
+        }
+      }
+    }
+    
+    if (!foundIdPosition) {
+      return null;
+    }
+    
+    // このページIDの次のページIDまたはドキュメントの終わりまでを探す
+    // 次のページIDまたは改ページがこのページIDの終了を意味する
+    const nextPageIdIndex = docText.indexOf('Notion Page ID:', pageIdIndex + searchPattern.length);
+    const nextPageBreak = docText.indexOf('\n\n\n', pageIdIndex + searchPattern.length);
+    
+    if (nextPageIdIndex !== -1 && (nextPageBreak === -1 || nextPageIdIndex < nextPageBreak)) {
+      // 次のページIDがある場合、そのページのタイトルの開始位置を取得
+      
+      // タイトル検出のため、このページIDから次のページIDの間のテキストを探索
+      let titleStartIndex = -1;
+      let currentPos = 0;
+      
+      for (const item of content) {
+        if (item.paragraph && item.paragraph.elements) {
+          for (const element of item.paragraph.elements) {
+            if (element.textRun && element.textRun.content) {
+              const elemText = element.textRun.content;
+              const elemPos = docText.indexOf(elemText, currentPos);
+              currentPos = elemPos + elemText.length;
+              
+              // 次のNotionページIDを含む要素の位置を特定
+              if (elemText.includes('Notion Page ID:') && 
+                  elemPos > pageIdIndex && 
+                  elemPos <= nextPageIdIndex + 15) { // 「Notion Page ID:」の長さを考慮
+                
+                // この要素の直前の要素（＝タイトル）を探す
+                let foundNextPageTitle = false;
+                
+                // contentを再度走査して前のタイトル要素を見つける
+                for (const titleItem of content) {
+                  if (titleItem.paragraph && 
+                      titleItem.endIndex && 
+                      titleItem.endIndex <= item.startIndex && 
+                      (!foundNextPageTitle || titleItem.endIndex > titleStartIndex)) {
+                    
+                    // タイトルの可能性がある要素を見つけた
+                    // タイトルは通常ページID行の直前にある
+                    titleStartIndex = titleItem.startIndex;
+                    foundNextPageTitle = true;
+                  }
+                }
+                
+                if (foundNextPageTitle) {
+                  endIndex = titleStartIndex;
+                  return { startIndex, endIndex };
+                }
+                
+                // タイトルが見つからない場合はIDの行の先頭を使用
+                endIndex = item.startIndex;
+                return { startIndex, endIndex };
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // 次のページIDが見つからない場合はドキュメントの最後まで
+    function getLastNonNewlineEndIndex(contents: any[], idx: number): number {
+      if (idx < 0) return 0;
+      
+      const item = contents[idx];
+      if (
+        item.paragraph &&
+        item.paragraph.elements
+      ) {
+        if (
+          item.paragraph.elements.length > 0 &&
+          item.paragraph.elements.every(
+            (el: any) => (el.textRun?.content ?? '').trim() === '' || el.textRun?.content === '\n'
+          )
+        ) {
+          // 改行のみの場合は一つ前を再帰的に探す
+          return getLastNonNewlineEndIndex(contents, idx - 1);
+        } else if (
+          item.paragraph.elements[item.paragraph.elements.length - 1].textRun?.content.endsWith('\n')
+        ) {
+          // 改行がある場合は一つ前の位置を返す
+          return item.endIndex - 1;
+        }
+      }
+
+      // それ以外の場合はそのままendIndexを返す
+      return item.endIndex || 0;
+    }
+
+    if (content.length > 0) {
+      endIndex = getLastNonNewlineEndIndex(content, content.length - 1);
+    }
+    
+    return { startIndex, endIndex };
+  }
+
+  /**
+   * 既存のページコンテンツを削除するリクエストを生成
+   * Google DocsのAPIでは段落の最後の改行文字を削除範囲に含められないため、適切に調整する
+   */
+  private createDeleteContentRequests(startIndex: number, endIndex: number): any[] {  
+    return [
+      {
+        deleteContentRange: {
+          range: {
+            startIndex: startIndex,
+            endIndex: endIndex
+          }
+        }
+      },
+      {
+        insertText: {
+          location: {
+            index: startIndex
+          },
+          text: '\n'
+        }
+      }
+    ];
+  }
+
+  /**
+   * スタイルをリセットするリクエストを生成
+   * これにより新しいコンテンツが以前のスタイルの影響を受けなくなる
+   */
+  private createResetStyleRequest(index: number): any[] {
+    return [
+      {
+        updateParagraphStyle: {
+          range: {
+            startIndex: index,
+            endIndex: index + 1
+          },
+          paragraphStyle: {
+            namedStyleType: 'NORMAL_TEXT'
+          },
+          fields: '*'
+        }
+      }
+    ];
   }
 }

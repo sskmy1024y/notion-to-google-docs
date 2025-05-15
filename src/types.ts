@@ -39,6 +39,7 @@ export interface GoogleDocsResponse {
     requiredRevisionId?: string;
   };
   replies?: any[];
+  updated?: boolean; // ページが更新されたかどうかを示すフラグ
 }
 
 // Application types

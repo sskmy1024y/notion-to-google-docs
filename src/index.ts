@@ -2,82 +2,11 @@
 
 console.log('Script starting...');
 
-import { validateConfig, NOTION_PAGE_ID, NOTION_DATABASE_ID, GOOGLE_DOC_ID, NEEDS_DYNAMIC_AUTH } from './config';
+import { validateConfig, NOTION_DATABASE_ID, GOOGLE_DOC_ID } from './config';
 import { NotionService } from './notion';
 import { GoogleDocsService } from './google-docs';
 import { TransferResult, MultiTransferResult } from './types';
 import { selectNotionPage, selectMultipleNotionPages } from './cli';
-
-/**
- * Main function to transfer content from Notion to Google Docs
- */
-async function transferNotionToGoogleDocs(): Promise<TransferResult> {
-  try {
-    // Validate environment variables
-    validateConfig();
-    
-    console.log('Starting transfer from Notion to Google Docs...');
-    
-    // Initialize services
-    const notionService = new NotionService();
-    
-    // GoogleDocsServiceの初期化方法を決定
-    let googleDocsService;
-    if (NEEDS_DYNAMIC_AUTH) {
-      console.log('リフレッシュトークンが見つかりません。動的認証を開始します...');
-      // 動的認証でGoogleDocsServiceを作成
-      googleDocsService = await GoogleDocsService.createWithDynamicAuth();
-      console.log('動的認証が完了しました。');
-    } else {
-      // 既存の静的認証情報でGoogleDocsServiceを作成
-      googleDocsService = new GoogleDocsService();
-    }
-    
-    // ページIDの取得方法を決定
-    let pageId: string;
-    
-    if (NOTION_DATABASE_ID) {
-      console.log(`Notionデータベース(${NOTION_DATABASE_ID})からページのリストを取得しています...`);
-      const pages = await notionService.getDatabasePages();
-      console.log(`${pages.length}個のページが見つかりました。`);
-      
-      // CLIでページを選択
-      pageId = await selectNotionPage(pages);
-      console.log(`選択されたページID: ${pageId}`);
-    } else {
-      // 環境変数からページIDを使用
-      pageId = NOTION_PAGE_ID;
-      console.log(`Notion Page ID: ${pageId}`);
-    }
-    
-    console.log(`Google Doc ID: ${GOOGLE_DOC_ID}`);
-    
-    // Fetch Notion page
-    console.log('Fetching Notion page...');
-    const notionPage = await notionService.getPage(pageId);
-    console.log(`Fetched Notion page: "${notionPage.title}" with ${notionPage.blocks.length} blocks`);
-    
-    // Write to Google Docs
-    console.log('Writing to Google Docs...');
-    const result = await googleDocsService.writeToDoc(notionPage);
-    console.log(`Successfully wrote to Google Doc: ${result.documentId}`);
-    
-    return {
-      success: true,
-      message: `Successfully transferred "${notionPage.title}" from Notion to Google Docs`,
-      notionPageId: notionPage.id,
-      googleDocId: result.documentId
-    };
-  } catch (error) {
-    console.error('Error transferring from Notion to Google Docs:', error);
-    
-    return {
-      success: false,
-      message: `Failed to transfer from Notion to Google Docs: ${error instanceof Error ? error.message : String(error)}`,
-      error: error instanceof Error ? error : new Error(String(error))
-    };
-  }
-}
 
 /**
  * 複数のNotionページをGoogle Docsに転送する
@@ -92,17 +21,9 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
     // Initialize services
     const notionService = new NotionService();
     
-    // GoogleDocsServiceの初期化方法を決定
-    let googleDocsService;
-    if (NEEDS_DYNAMIC_AUTH) {
-      console.log('リフレッシュトークンが見つかりません。動的認証を開始します...');
-      // 動的認証でGoogleDocsServiceを作成
-      googleDocsService = await GoogleDocsService.createWithDynamicAuth();
-      console.log('動的認証が完了しました。');
-    } else {
-      // 既存の静的認証情報でGoogleDocsServiceを作成
-      googleDocsService = new GoogleDocsService();
-    }
+    // 動的認証でGoogleDocsServiceを作成
+    const googleDocsService = await GoogleDocsService.createWithDynamicAuth();
+    console.log('動的認証が完了しました。');
     
     // ページIDのリストを取得
     let pageIds: string[] = [];
@@ -115,10 +36,6 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
       // CLIで複数ページを選択
       pageIds = await selectMultipleNotionPages(pages);
       console.log(`選択されたページ数: ${pageIds.length}`);
-    } else {
-      // 環境変数から単一ページIDを使用
-      pageIds = [NOTION_PAGE_ID];
-      console.log(`環境変数からNotionページIDを使用します: ${NOTION_PAGE_ID}`);
     }
     
     console.log(`Google Doc ID: ${GOOGLE_DOC_ID}`);

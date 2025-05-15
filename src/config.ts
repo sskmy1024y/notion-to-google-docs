@@ -6,18 +6,12 @@ dotenv.config({ path: resolve(process.cwd(), '.env') });
 
 // Notion configuration
 export const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
-export const NOTION_PAGE_ID = process.env.NOTION_PAGE_ID || '';
 export const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID || '';
 
 // Google API configuration
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-export const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
-export const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN || '';
 export const GOOGLE_DOC_ID = process.env.GOOGLE_DOC_ID || '';
-
-// 動的認証が必要かどうかを判断する
-export const NEEDS_DYNAMIC_AUTH = !GOOGLE_REFRESH_TOKEN;
 
 // Validate required environment variables
 export function validateConfig(): void {
@@ -30,16 +24,8 @@ export function validateConfig(): void {
   ];
 
   // データベースモードかページモードどちらか一方が必要
-  if (!NOTION_DATABASE_ID && !NOTION_PAGE_ID) {
+  if (!NOTION_DATABASE_ID) {
     throw new Error('Either NOTION_DATABASE_ID or NOTION_PAGE_ID must be provided');
-  }
-
-  // リフレッシュトークンを使用する場合のみ、GOOGLE_REDIRECT_URIとGOOGLE_REFRESH_TOKENを検証
-  if (!NEEDS_DYNAMIC_AUTH) {
-    requiredVars.push(
-      { name: 'GOOGLE_REDIRECT_URI', value: GOOGLE_REDIRECT_URI },
-      { name: 'GOOGLE_REFRESH_TOKEN', value: GOOGLE_REFRESH_TOKEN }
-    );
   }
 
   const missingVars = requiredVars.filter(({ value }) => !value);
