@@ -1,6 +1,14 @@
 import { Client } from '@notionhq/client';
 import { NOTION_API_KEY, NOTION_DATABASE_ID } from './config';
 import { NotionBlock, NotionPage, NotionPageListItem, NotionTableBlock } from './types';
+import fs from 'fs';
+import path from 'path';
+
+const LOG_FILE = path.join(process.cwd(), 'debug.log');
+function writeLog(message: string) {
+  const timestamp = new Date().toISOString();
+  fs.appendFileSync(LOG_FILE, `[${timestamp}] ${message}\n`);
+}
 
 export class NotionService {
   private client: Client;
@@ -16,11 +24,13 @@ export class NotionService {
    */
   async getDatabasePages(databaseId: string = NOTION_DATABASE_ID): Promise<NotionPageListItem[]> {
     try {
+      writeLog(`[Notion] getDatabasePages request: ${databaseId}`);
       // データベースのページを取得
       // Notionの内部APIではlast_edited_timeの直接指定が動作しないため、ソートを指定しない
       const response = await this.client.databases.query({
         database_id: databaseId,
       });
+      writeLog(`[Notion] getDatabasePages response: ${JSON.stringify(response, null, 2)}`);
 
       // ページの基本情報を抽出
       const pages = response.results.map((page: any) => {
@@ -54,8 +64,10 @@ export class NotionService {
    */
   async getPage(pageId: string): Promise<NotionPage> {
     try {
+      writeLog(`[Notion] getPage request: ${pageId}`);
       // Get page metadata
       const page = await this.client.pages.retrieve({ page_id: pageId });
+      writeLog(`[Notion] getPage response: ${JSON.stringify(page, null, 2)}`);
       
       // Get page title
       const title = this.extractPageTitle(page);
@@ -103,10 +115,12 @@ export class NotionService {
     
     // Notion API paginates blocks, so we need to fetch them in batches
     do {
+      writeLog(`[Notion] getPageBlocks request: ${pageId}, cursor: ${cursor}`);
       const response = await this.client.blocks.children.list({
         block_id: pageId,
         start_cursor: cursor,
       });
+      writeLog(`[Notion] getPageBlocks response: ${JSON.stringify(response, null, 2)}`);
       
       blocks.push(...response.results as NotionBlock[]);
       cursor = response.next_cursor || undefined;
@@ -131,8 +145,10 @@ export class NotionService {
       // Check if the block has children
       if (block.has_children) {
         try {
+          writeLog(`[Notion] fetchChildBlocks request: ${block.id}`);
           // Fetch child blocks
           const childBlocks = await this.getPageBlocks(block.id);
+          writeLog(`[Notion] fetchChildBlocks response: ${JSON.stringify(childBlocks, null, 2)}`);
           
           // Add child_blocks property to the parent block
           block.child_blocks = childBlocks;

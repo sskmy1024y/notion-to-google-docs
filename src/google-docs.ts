@@ -15,6 +15,14 @@ import { processQuoteBlock } from './blocks/block-quote';
 import { processCodeBlock } from './blocks/block-code';
 import { processDividerBlock } from './blocks/block-divider';
 import { processUnsupportedBlock } from './blocks/block-unsupported';
+import fs from 'fs';
+import path from 'path';
+
+const LOG_FILE = path.join(process.cwd(), 'debug.log');
+function writeLog(message: string) {
+  const timestamp = new Date().toISOString();
+  fs.appendFileSync(LOG_FILE, `[${timestamp}] ${message}\n`);
+}
 
 export class GoogleDocsService {
   private docs: docs_v1.Docs;
@@ -50,15 +58,17 @@ export class GoogleDocsService {
    */
   async writeToDoc(notionPage: NotionPage, docId: string = GOOGLE_DOC_ID): Promise<GoogleDocsResponse> {
     try {
-      // ドキュメントの情報を取得
+      writeLog(`[GoogleDocs] documents.get request: ${docId}`);
       const document = await this.docs.documents.get({
         documentId: docId
       });
+      writeLog(`[GoogleDocs] documents.get response: ${JSON.stringify(document.data, null, 2)}`);
       
       // Notionページが既にドキュメント内に存在するか確認
       const existingPageLocation = this.findNotionPageInDoc(document, notionPage.id);
       
       if (existingPageLocation) {
+        writeLog(`[GoogleDocs] Updating existing Notion page: ${notionPage.id}`);
         console.log(`既存のNotionページID ${notionPage.id} を発見しました。更新します。`);
        
         // const adjustedEndIndex = this.adjustEndIndexForNewline(
@@ -73,6 +83,7 @@ export class GoogleDocsService {
           existingPageLocation.endIndex,
         );
         
+        writeLog(`[GoogleDocs] batchUpdate (delete) request: ${JSON.stringify(deleteRequests, null, 2)}`);
         // 既存のコンテンツ削除
         await this.docs.documents.batchUpdate({
           documentId: docId,
@@ -82,6 +93,7 @@ export class GoogleDocsService {
         // スタイルをリセットするリクエストを実行
         // これにより、周囲のテキストスタイルが新しいコンテンツに影響しなくなる
         const resetStyleRequests = this.createResetStyleRequest(existingPageLocation.startIndex);
+        writeLog(`[GoogleDocs] batchUpdate (reset style) request: ${JSON.stringify(resetStyleRequests, null, 2)}`);
         await this.docs.documents.batchUpdate({
           documentId: docId,
           requestBody: { requests: resetStyleRequests }
@@ -90,11 +102,13 @@ export class GoogleDocsService {
         // 同じ位置に新しいコンテンツを挿入
         const insertRequests = this.convertNotionToGoogleDocs(notionPage, existingPageLocation.startIndex);
         
+        writeLog(`[GoogleDocs] batchUpdate (insert) request: ${JSON.stringify(insertRequests, null, 2)}`);
         // 更新したコンテンツを書き込む
         const response = await this.docs.documents.batchUpdate({
           documentId: docId,
           requestBody: { requests: insertRequests }
         });
+        writeLog(`[GoogleDocs] batchUpdate (insert) response: ${JSON.stringify(response.data, null, 2)}`);
         
         return {
           documentId: docId,
@@ -121,6 +135,7 @@ export class GoogleDocsService {
           
           // 空のドキュメントでない場合は改ページを追加
           if (startIndex > 1) {
+            writeLog(`[GoogleDocs] batchUpdate (insertPageBreak) request: index=${startIndex}`);
             await this.docs.documents.batchUpdate({
               documentId: docId,
               requestBody: {
@@ -141,6 +156,7 @@ export class GoogleDocsService {
             
             // 新規追加の場合もスタイルをリセット
             const resetStyleRequests = this.createResetStyleRequest(startIndex);
+            writeLog(`[GoogleDocs] batchUpdate (reset style) request: ${JSON.stringify(resetStyleRequests, null, 2)}`);
             await this.docs.documents.batchUpdate({
               documentId: docId,
               requestBody: { requests: resetStyleRequests }
@@ -152,6 +168,7 @@ export class GoogleDocsService {
       // Convert Notion blocks to Google Docs requests
       const requests = this.convertNotionToGoogleDocs(notionPage, startIndex);
       
+      writeLog(`[GoogleDocs] batchUpdate (insert new) request: ${JSON.stringify(requests, null, 2)}`);
       // Write to Google Doc
       const response = await this.docs.documents.batchUpdate({
         documentId: docId,
@@ -159,6 +176,7 @@ export class GoogleDocsService {
           requests
         }
       });
+      writeLog(`[GoogleDocs] batchUpdate (insert new) response: ${JSON.stringify(response.data, null, 2)}`);
       
       return {
         documentId: docId,
@@ -171,6 +189,7 @@ export class GoogleDocsService {
         updated: false // 新規追加されたことを示すフラグを追加
       };
     } catch (error) {
+      writeLog(`[ERROR][GoogleDocs] ${error instanceof Error ? error.message : String(error)}`);
       console.error('Error writing to Google Doc:', error);
       throw error;
     }

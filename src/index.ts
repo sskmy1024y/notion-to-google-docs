@@ -2,11 +2,34 @@
 
 console.log('Script starting...');
 
+import fs from 'fs';
+import path from 'path';
 import { validateConfig, NOTION_DATABASE_ID, GOOGLE_DOC_ID } from './config';
 import { NotionService } from './notion';
 import { GoogleDocsService } from './google-docs';
 import { TransferResult, MultiTransferResult } from './types';
 import { selectNotionPage, selectMultipleNotionPages } from './cli';
+
+// ログファイルパス
+const LOG_FILE = path.join(process.cwd(), 'debug.log');
+
+// ログ書き込み関数
+function writeLog(message: string) {
+  const timestamp = new Date().toISOString();
+  fs.appendFileSync(LOG_FILE, `[${timestamp}] ${message}\n`);
+}
+
+// console.log, console.errorをフック
+const origLog = console.log;
+const origError = console.error;
+console.log = (...args: any[]) => {
+  origLog(...args);
+  writeLog(args.map(a => (typeof a === 'string' ? a : JSON.stringify(a, null, 2))).join(' '));
+};
+console.error = (...args: any[]) => {
+  origError(...args);
+  writeLog('[ERROR] ' + args.map(a => (typeof a === 'string' ? a : JSON.stringify(a, null, 2))).join(' '));
+};
 
 /**
  * 複数のNotionページをGoogle Docsに転送する
