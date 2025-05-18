@@ -5,6 +5,21 @@ export interface NotionBlock {
   [key: string]: any;
 }
 
+// テーブルブロックの型定義
+export interface NotionTableRow {
+  cells: string[][];
+}
+
+export interface NotionTableBlock extends NotionBlock {
+  type: 'table';
+  table: {
+    table_width: number;
+    has_column_header: boolean;
+    has_row_header: boolean;
+    rows: NotionTableRow[];
+  };
+}
+
 export interface NotionPageProperty {
   id: string;
   name: string;

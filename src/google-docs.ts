@@ -7,6 +7,14 @@ import {
 import { NotionBlock, NotionPage, GoogleDocsRequest, GoogleDocsResponse } from './types';
 import { createOAuth2Client, getGoogleAuthCredentials } from './google-auth';
 import { start } from 'repl';
+import { processParagraphBlock } from './blocks/block-paragraph';
+import { processHeadingBlock } from './blocks/block-heading';
+import { processListBlock } from './blocks/block-list';
+import { processToDoBlock } from './blocks/block-todo';
+import { processQuoteBlock } from './blocks/block-quote';
+import { processCodeBlock } from './blocks/block-code';
+import { processDividerBlock } from './blocks/block-divider';
+import { processUnsupportedBlock } from './blocks/block-unsupported';
 
 export class GoogleDocsService {
   private docs: docs_v1.Docs;
@@ -326,261 +334,28 @@ export class GoogleDocsService {
    * Process a single Notion block and convert it to Google Docs requests
    */
   private processBlock(block: NotionBlock, startIndex: number): { requests: any[], textLength: number } {
-    const requests: any[] = [];
-    let text = '';
-    let textLength = 0;
-    
+    // ブロックタイプごとに外部関数に委譲
     switch (block.type) {
       case 'paragraph':
-        text = this.extractTextFromRichText(block.paragraph?.rich_text || []);
-        if (text) {
-          requests.push({
-            insertText: {
-              location: { index: startIndex },
-              text: text + '\n'
-            }
-          });
-          textLength = text.length + 1; // +1 for newline
-        }
-        break;
-        
+        return processParagraphBlock(block, startIndex, this.extractTextFromRichText.bind(this));
       case 'heading_1':
-        text = this.extractTextFromRichText(block.heading_1?.rich_text || []);
-        if (text) {
-          requests.push(
-            {
-              insertText: {
-                location: { index: startIndex },
-                text: text + '\n'
-              }
-            },
-            {
-              updateParagraphStyle: {
-                range: {
-                  startIndex: startIndex,
-                  endIndex: startIndex + text.length
-                },
-                paragraphStyle: {
-                  namedStyleType: 'HEADING_1'
-                },
-                fields: 'namedStyleType'
-              }
-            }
-          );
-          textLength = text.length + 1; // +1 for newline
-        }
-        break;
-        
       case 'heading_2':
-        text = this.extractTextFromRichText(block.heading_2?.rich_text || []);
-        if (text) {
-          requests.push(
-            {
-              insertText: {
-                location: { index: startIndex },
-                text: text + '\n'
-              }
-            },
-            {
-              updateParagraphStyle: {
-                range: {
-                  startIndex: startIndex,
-                  endIndex: startIndex + text.length
-                },
-                paragraphStyle: {
-                  namedStyleType: 'HEADING_2'
-                },
-                fields: 'namedStyleType'
-              }
-            }
-          );
-          textLength = text.length + 1; // +1 for newline
-        }
-        break;
-        
       case 'heading_3':
-        text = this.extractTextFromRichText(block.heading_3?.rich_text || []);
-        if (text) {
-          requests.push(
-            {
-              insertText: {
-                location: { index: startIndex },
-                text: text + '\n'
-              }
-            },
-            {
-              updateParagraphStyle: {
-                range: {
-                  startIndex: startIndex,
-                  endIndex: startIndex + text.length
-                },
-                paragraphStyle: {
-                  namedStyleType: 'HEADING_3'
-                },
-                fields: 'namedStyleType'
-              }
-            }
-          );
-          textLength = text.length + 1; // +1 for newline
-        }
-        break;
-        
+        return processHeadingBlock(block, startIndex, this.extractTextFromRichText.bind(this));
       case 'bulleted_list_item':
-        text = this.extractTextFromRichText(block.bulleted_list_item?.rich_text || []);
-        if (text) {
-          requests.push(
-            {
-              insertText: {
-                location: { index: startIndex },
-                text: text + '\n'
-              }
-            },
-            {
-              createParagraphBullets: {
-                range: {
-                  startIndex: startIndex,
-                  endIndex: startIndex + text.length
-                },
-                bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE'
-              }
-            }
-          );
-          textLength = text.length + 1; // +1 for newline
-        }
-        break;
-        
       case 'numbered_list_item':
-        text = this.extractTextFromRichText(block.numbered_list_item?.rich_text || []);
-        if (text) {
-          requests.push(
-            {
-              insertText: {
-                location: { index: startIndex },
-                text: text + '\n'
-              }
-            },
-            {
-              createParagraphBullets: {
-                range: {
-                  startIndex: startIndex,
-                  endIndex: startIndex + text.length
-                },
-                bulletPreset: 'NUMBERED_DECIMAL'
-              }
-            }
-          );
-          textLength = text.length + 1; // +1 for newline
-        }
-        break;
-        
+        return processListBlock(block, startIndex, this.extractTextFromRichText.bind(this));
       case 'to_do':
-        text = this.extractTextFromRichText(block.to_do?.rich_text || []);
-        if (text) {
-          requests.push({
-            insertText: {
-              location: { index: startIndex },
-              text: `☐ ${text}\n`
-            }
-          });
-          textLength = text.length + 3; // +3 for checkbox and space and newline
-        }
-        break;
-        
+        return processToDoBlock(block, startIndex, this.extractTextFromRichText.bind(this));
       case 'quote':
-        text = this.extractTextFromRichText(block.quote?.rich_text || []);
-        if (text) {
-          requests.push(
-            {
-              insertText: {
-                location: { index: startIndex },
-                text: text + '\n'
-              }
-            },
-            {
-              updateParagraphStyle: {
-                range: {
-                  startIndex: startIndex,
-                  endIndex: startIndex + text.length
-                },
-                paragraphStyle: {
-                  indentStart: {
-                    magnitude: 36,
-                    unit: 'PT'
-                  },
-                  indentFirstLine: {
-                    magnitude: 36,
-                    unit: 'PT'
-                  }
-                },
-                fields: 'indentStart,indentFirstLine'
-              }
-            }
-          );
-          textLength = text.length + 1; // +1 for newline
-        }
-        break;
-        
+        return processQuoteBlock(block, startIndex, this.extractTextFromRichText.bind(this));
       case 'code':
-        text = this.extractTextFromRichText(block.code?.rich_text || []);
-        if (text) {
-          requests.push(
-            {
-              insertText: {
-                location: { index: startIndex },
-                text: text + '\n'
-              }
-            },
-            {
-              updateTextStyle: {
-                range: {
-                  startIndex: startIndex,
-                  endIndex: startIndex + text.length
-                },
-                textStyle: {
-                  fontFamily: 'Consolas'
-                },
-                fields: 'fontFamily'
-              }
-            }
-          );
-          textLength = text.length + 1; // +1 for newline
-        }
-        break;
-        
+        return processCodeBlock(block, startIndex, this.extractTextFromRichText.bind(this));
       case 'divider':
-        requests.push({
-          insertText: {
-            location: { index: startIndex },
-            text: '---\n'
-          }
-        });
-        textLength = 4; // 3 dashes + newline
-        break;
-        
+        return processDividerBlock(block, startIndex);
       default:
-        // For unsupported block types, add a placeholder
-        requests.push({
-          insertText: {
-            location: { index: startIndex },
-            text: `[Unsupported block type: ${block.type}]\n`
-          }
-        });
-        textLength = `[Unsupported block type: ${block.type}]`.length + 1; // +1 for newline
+        return processUnsupportedBlock(block, startIndex);
     }
-    
-    // Process child blocks if they exist
-    if (block.child_blocks && block.child_blocks.length > 0) {
-      let childIndex = startIndex + textLength;
-      
-      for (const childBlock of block.child_blocks) {
-        const childResult = this.processBlock(childBlock, childIndex);
-        requests.push(...childResult.requests);
-        childIndex += childResult.textLength;
-        textLength += childResult.textLength;
-      }
-    }
-    
-    return { requests, textLength };
   }
 
   /**

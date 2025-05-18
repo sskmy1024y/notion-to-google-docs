@@ -1,6 +1,6 @@
 import { Client } from '@notionhq/client';
 import { NOTION_API_KEY, NOTION_DATABASE_ID } from './config';
-import { NotionBlock, NotionPage, NotionPageListItem } from './types';
+import { NotionBlock, NotionPage, NotionPageListItem, NotionTableBlock } from './types';
 
 export class NotionService {
   private client: Client;
@@ -143,6 +143,44 @@ export class NotionService {
     }
     
     return blocksWithChildren;
+  }
+
+  /**
+   * テーブルのデータを抽出して整形する
+   */
+  private extractTableData(block: NotionBlock): any {
+    if (block.type !== 'table') {
+      return null;
+    }
+
+    try {
+      // テーブルの基本情報を取得
+      const tableData: NotionTableBlock['table'] = {
+        table_width: block.table.table_width || 0,
+        has_column_header: block.table.has_column_header || false,
+        has_row_header: block.table.has_row_header || false,
+        rows: []
+      };
+
+      // 子ブロックからテーブル行のデータを取得
+      if (block.child_blocks && Array.isArray(block.child_blocks)) {
+        for (const rowBlock of block.child_blocks) {
+          if (rowBlock.type === 'table_row') {
+            const cells = rowBlock.table_row.cells.map((cell: any[]) => {
+              // 各セルのリッチテキストを平文に変換
+              return cell.map((richText: any) => richText.plain_text || '').join('');
+            });
+            
+            tableData.rows.push({ cells: [cells] });
+          }
+        }
+      }
+
+      return tableData;
+    } catch (error) {
+      console.error(`Error extracting table data for block ${block.id}:`, error);
+      return null;
+    }
   }
 
   /**
