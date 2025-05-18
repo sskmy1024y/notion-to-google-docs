@@ -1,3 +1,9 @@
+import { docs_v1 } from "googleapis";
+
+export type Nullish<T> = T | null | undefined;
+
+export type Nullable<T> = T | null;
+
 // Notion types
 export interface NotionBlock {
   id: string;
@@ -11,9 +17,24 @@ export interface NotionBlock {
   [key: string]: any;
 }
 
-// テーブルブロックの型定義
-export interface NotionTableRow {
-  cells: string[][];
+export interface NotionText {
+  type: 'text';
+  text: {
+    content: string;
+    link?: Nullable<{
+      url: string;
+    }>;
+    annotations?: {
+      bold?: boolean;
+      italic?: boolean;
+      strikethrough?: boolean;
+      underline?: boolean;
+      code?: boolean;
+      color?: string;
+    };
+    plain_text: string;
+    href?: Nullable<string>
+  };
 }
 
 export interface NotionTableBlock extends NotionBlock {
@@ -22,7 +43,13 @@ export interface NotionTableBlock extends NotionBlock {
     table_width: number;
     has_column_header: boolean;
     has_row_header: boolean;
-    rows: NotionTableRow[];
+  };
+}
+
+export interface NotionTableRowBlock extends NotionBlock {
+  type: 'table_row';
+  table_row: {
+    cells: NotionText[][];
   };
 }
 
@@ -67,6 +94,9 @@ export interface GoogleDocsResponse {
 export interface BlockProcessResult {
   requests: any[];
   textLength: number;
+  /**
+   * @deprecated
+   */
   updateImmediately?: boolean;
 }
 
@@ -77,7 +107,9 @@ export type BlockProcessFunction = (
   startIndex: number,
   extractTextFromRichText: (richText: any[]) => string,
   requests?: any[],
-  updateBatch?: (reqs: any[]) => Promise<any[]>
+  updateBatch?: (reqs: any[]) => Promise<any[]>,
+  docsClient?: docs_v1.Docs,
+  docId?: string
 ) => MaybePromise<BlockProcessResult>;
 
 // Application types

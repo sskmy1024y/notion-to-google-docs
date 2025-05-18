@@ -17,12 +17,8 @@ import { processDividerBlock } from './blocks/block-divider';
 import { processUnsupportedBlock } from './blocks/block-unsupported';
 import fs from 'fs';
 import path from 'path';
-
-const LOG_FILE = path.join(process.cwd(), 'debug.log');
-function writeLog(message: string) {
-  const timestamp = new Date().toISOString();
-  fs.appendFileSync(LOG_FILE, `[${timestamp}] ${message}\n`);
-}
+import { processTableBlock } from './blocks/block-table';
+import { writeLog } from './log';
 
 export class GoogleDocsService {
   private docs: docs_v1.Docs;
@@ -317,6 +313,7 @@ export class GoogleDocsService {
     for (const block of notionPage.blocks) {
       const blockResult = await this.processBlock(block, requests, currentIndex, docId);
       currentIndex += blockResult.textLength;
+      requests = blockResult.requests;
     }
 
     // 最後に、全てのリクエストをまとめてGoogle Docsに送信
@@ -345,7 +342,7 @@ export class GoogleDocsService {
     } : undefined;
 
     // ブロックを処理し、Google Docs APIリクエストを生成
-    return await processBlockFn(block, startIndex, this.extractTextFromRichText.bind(this), requests, updateBatch);
+    return await processBlockFn(block, startIndex, this.extractTextFromRichText.bind(this), requests, updateBatch, this.docs, docId);
   }
 
   /**
@@ -372,6 +369,8 @@ export class GoogleDocsService {
         return processCodeBlock;
       case 'divider':
         return processDividerBlock;
+      case 'table':
+        return processTableBlock;
       default:
         return processUnsupportedBlock;
     }
@@ -694,10 +693,11 @@ export class GoogleDocsService {
   async updateBatch(requests: any[], docId: string): Promise<any[]> {
     if (requests && requests.length > 0) {
       writeLog(`[GoogleDocs] batchUpdate request: ${JSON.stringify(requests, null, 2)}`);
-      await this.docs.documents.batchUpdate({
+      const response = await this.docs.documents.batchUpdate({
         documentId: docId,
         requestBody: { requests }
       });
+      writeLog(`[GoogleDocs] batchUpdate response: ${JSON.stringify(response.data, null, 2)}`);
     }
     // リクエスト実行後は空の配列を返す
     return [];
