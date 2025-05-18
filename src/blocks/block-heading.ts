@@ -1,10 +1,12 @@
 import { NotionBlock, BlockProcessResult } from '../types';
 
-export function processHeadingBlock(
+export async function processHeadingBlock(
   block: NotionBlock,
   startIndex: number,
-  extractTextFromRichText: (richText: any[]) => string
-): BlockProcessResult {
+  extractTextFromRichText: (richText: any[]) => string,
+  requests: any[] = [],
+  updateBatch?: (reqs: any[]) => Promise<any[]>
+): Promise<BlockProcessResult> {
   let text = '';
   let style: 'HEADING_1' | 'HEADING_2' | 'HEADING_3' = 'HEADING_1';
   if (block.type === 'heading_1') {
@@ -17,7 +19,7 @@ export function processHeadingBlock(
     text = extractTextFromRichText(block.heading_3?.rich_text || []);
     style = 'HEADING_3';
   }
-  const requests: any[] = [];
+  
   let textLength = 0;
   if (text) {
     requests.push(
@@ -41,7 +43,14 @@ export function processHeadingBlock(
       }
     );
     textLength = text.length + 1;
+    
+    // 見出しは文書構造の重要な要素なので、updateBatchが提供されている場合は即時更新する
+    if (updateBatch && requests.length > 0) {
+      // updateBatchを呼び出して、リクエストをすぐに適用
+      requests = await updateBatch(requests);
+    }
   }
-  // 見出しは文書構造の重要な要素なので、即時更新する
+  
+  // 見出しは文書構造の重要な要素なので、引き続き即時更新フラグを設定
   return { requests, textLength, updateImmediately: true };
 }

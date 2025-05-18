@@ -70,6 +70,16 @@ export interface BlockProcessResult {
   updateImmediately?: boolean;
 }
 
+export type MaybePromise<T> = T | Promise<T>;
+
+export type BlockProcessFunction = (
+  block: NotionBlock,
+  startIndex: number,
+  extractTextFromRichText: (richText: any[]) => string,
+  requests?: any[],
+  updateBatch?: (reqs: any[]) => Promise<any[]>
+) => MaybePromise<BlockProcessResult>;
+
 // Application types
 export interface TransferResult {
   success: boolean;

@@ -4,7 +4,7 @@ import {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_DOC_ID
 } from './config';
-import { NotionBlock, NotionPage, GoogleDocsRequest, GoogleDocsResponse, BlockProcessResult } from './types';
+import { NotionBlock, NotionPage, GoogleDocsRequest, GoogleDocsResponse, BlockProcessResult, BlockProcessFunction } from './types';
 import { createOAuth2Client, getGoogleAuthCredentials } from './google-auth';
 import { start } from 'repl';
 import { processParagraphBlock } from './blocks/block-paragraph';
@@ -312,20 +312,20 @@ export class GoogleDocsService {
       });
       currentIndex += 1;
     }
-    
-    // タイトルやプロパティ情報など基本情報を最初に更新
+
+    // 各ブロックを処理し、個別に更新を行う
+    for (const block of notionPage.blocks) {
+      const blockResult = await this.processBlock(block, requests, currentIndex, docId);
+      currentIndex += blockResult.textLength;
+    }
+
+    // 最後に、全てのリクエストをまとめてGoogle Docsに送信
     if (requests.length > 0) {
-      writeLog(`[GoogleDocs] batchUpdate (basic info) request: ${JSON.stringify(requests, null, 2)}`);
+      writeLog(`[GoogleDocs] batchUpdate (blocks) request: ${JSON.stringify(requests, null, 2)}`);
       await this.docs.documents.batchUpdate({
         documentId: docId,
         requestBody: { requests }
       });
-    }
-    
-    // 各ブロックを処理し、個別に更新を行う
-    for (const block of notionPage.blocks) {
-      const blockResult = await this.processBlockAndUpdate(block, currentIndex, docId);
-      currentIndex += blockResult.textLength;
     }
   }
 
@@ -333,46 +333,47 @@ export class GoogleDocsService {
    * Process a single block and immediately update Google Docs
    * 各ブロックを処理し、即時にGoogle Docsを更新する
    */
-  private async processBlockAndUpdate(block: NotionBlock, startIndex: number, docId: string): Promise<{ textLength: number }> {
-    const blockResult = this.processBlock(block, startIndex);
-    
-    // ブロック処理の結果を即座に適用
-    if (blockResult.requests && blockResult.requests.length > 0) {
-      writeLog(`[GoogleDocs] batchUpdate (block: ${block.type}) request: ${JSON.stringify(blockResult.requests, null, 2)}`);
-      await this.docs.documents.batchUpdate({
-        documentId: docId,
-        requestBody: { requests: blockResult.requests }
-      });
-    }
-    
-    return { textLength: blockResult.textLength };
+  private async processBlock(block: NotionBlock, requests: any[], startIndex: number, docId: string): Promise<BlockProcessResult> {
+    const processBlockFn = await this.matchProcess(block);
+
+    const updateBatch = docId ? async (requests: any[]) => {
+      if (requests && requests.length > 0) {
+        writeLog(`[GoogleDocs] batchUpdate (block) request: ${JSON.stringify(requests, null, 2)}`);
+        await this.updateBatch(requests, docId);
+      }
+      return [];
+    } : undefined;
+
+    // ブロックを処理し、Google Docs APIリクエストを生成
+    return await processBlockFn(block, startIndex, this.extractTextFromRichText.bind(this), requests, updateBatch);
   }
 
   /**
    * Process a single Notion block and convert it to Google Docs requests
    */
-  private processBlock(block: NotionBlock, startIndex: number): BlockProcessResult {
-    // ブロックタイプごとに外部関数に委譲
+  private matchProcess(block: NotionBlock): BlockProcessFunction {
+    // ブロックのタイプに応じて処理を分岐
+    // 各ブロックタイプに対して、適切な処理関数を呼び出す
     switch (block.type) {
       case 'paragraph':
-        return processParagraphBlock(block, startIndex, this.extractTextFromRichText.bind(this));
+        return processParagraphBlock;
       case 'heading_1':
       case 'heading_2':
       case 'heading_3':
-        return processHeadingBlock(block, startIndex, this.extractTextFromRichText.bind(this));
+        return processHeadingBlock;
       case 'bulleted_list_item':
       case 'numbered_list_item':
-        return processListBlock(block, startIndex, this.extractTextFromRichText.bind(this));
+        return processListBlock;
       case 'to_do':
-        return processToDoBlock(block, startIndex, this.extractTextFromRichText.bind(this));
+        return processToDoBlock;
       case 'quote':
-        return processQuoteBlock(block, startIndex, this.extractTextFromRichText.bind(this));
+        return processQuoteBlock;
       case 'code':
-        return processCodeBlock(block, startIndex, this.extractTextFromRichText.bind(this));
+        return processCodeBlock;
       case 'divider':
-        return processDividerBlock(block, startIndex);
+        return processDividerBlock;
       default:
-        return processUnsupportedBlock(block, startIndex);
+        return processUnsupportedBlock;
     }
   }
 
@@ -682,5 +683,23 @@ export class GoogleDocsService {
         }
       }
     ];
+  }
+
+  /**
+   * Update a Google Docs document with the given requests
+   * @param requests Google Docs API requests
+   * @param docId Google Docs document ID
+   * @returns Empty requests array to continue with
+   */
+  async updateBatch(requests: any[], docId: string): Promise<any[]> {
+    if (requests && requests.length > 0) {
+      writeLog(`[GoogleDocs] batchUpdate request: ${JSON.stringify(requests, null, 2)}`);
+      await this.docs.documents.batchUpdate({
+        documentId: docId,
+        requestBody: { requests }
+      });
+    }
+    // リクエスト実行後は空の配列を返す
+    return [];
   }
 }

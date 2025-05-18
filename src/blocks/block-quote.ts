@@ -1,12 +1,13 @@
 import { NotionBlock, BlockProcessResult } from '../types';
 
-export function processQuoteBlock(
+export async function processQuoteBlock(
   block: NotionBlock,
   startIndex: number,
-  extractTextFromRichText: (richText: any[]) => string
-): BlockProcessResult {
+  extractTextFromRichText: (richText: any[]) => string,
+  requests: any[] = [],
+  updateBatch?: (reqs: any[]) => Promise<any[]>
+): Promise<BlockProcessResult> {
   let text = extractTextFromRichText(block.quote?.rich_text || []);
-  const requests: any[] = [];
   let textLength = 0;
   if (text) {
     requests.push(
@@ -31,7 +32,12 @@ export function processQuoteBlock(
       }
     );
     textLength = text.length + 1;
+    
+    // 引用は通常は即時更新しないが、特定の条件でupdateBatchを呼び出すことも可能
+    // if (updateBatch && text.length > 500) {
+    //   requests = await updateBatch(requests);
+    // }
   }
-  // 引用ブロックはインデントが必要ですが、即時更新は不要
+  // 引用ブロックはインデントが必要ですが、引き続き即時更新は不要
   return { requests, textLength, updateImmediately: false };
 }

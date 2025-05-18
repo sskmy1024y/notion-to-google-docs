@@ -1,10 +1,12 @@
 import { NotionBlock, BlockProcessResult } from '../types';
 
-export function processListBlock(
+export async function processListBlock(
   block: NotionBlock,
   startIndex: number,
-  extractTextFromRichText: (richText: any[]) => string
-): BlockProcessResult {
+  extractTextFromRichText: (richText: any[]) => string,
+  requests: any[] = [],
+  updateBatch?: (reqs: any[]) => Promise<any[]>
+): Promise<BlockProcessResult> {
   let text = '';
   let bulletPreset = '';
   let shouldUpdateImmediately = false;
@@ -21,7 +23,6 @@ export function processListBlock(
     shouldUpdateImmediately = true;
   }
   
-  const requests: any[] = [];
   let textLength = 0;
   if (text) {
     requests.push(
@@ -42,6 +43,12 @@ export function processListBlock(
       }
     );
     textLength = text.length + 1;
+    
+    // 番号付きリストの場合は順序が重要なので、updateBatchが提供されている場合で番号付きリストの場合は即時更新する
+    if (updateBatch && shouldUpdateImmediately && requests.length > 0) {
+      // updateBatchを呼び出して、リクエストをすぐに適用
+      requests = await updateBatch(requests);
+    }
   }
   
   return { requests, textLength, updateImmediately: shouldUpdateImmediately };
