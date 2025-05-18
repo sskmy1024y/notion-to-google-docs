@@ -15,6 +15,7 @@ import { processDividerBlock } from './blocks/block-divider';
 import { processUnsupportedBlock } from './blocks/block-unsupported';
 import { processTableBlock } from './blocks/block-table';
 import { writeLog } from './log';
+import { matchProcess } from './blocks';
 
 export class GoogleDocsService {
   private docs: docs_v1.Docs;
@@ -162,52 +163,6 @@ export class GoogleDocsService {
   }
 
   /**
-   * Clear the content of a Google Doc
-   */
-  private async clearDocument(docId: string): Promise<void> {
-    try {
-      // Get the document to find its content
-      const document = await this.docs.documents.get({
-        documentId: docId
-      });
-      
-      // If document has content, clear it
-      if (document.data.body?.content && document.data.body.content.length > 1) {
-        // The first element is usually the document header, so we start from index 1
-        // and delete everything except the first element
-        const endIndex = document.data.body.content[document.data.body.content.length - 1].endIndex;
-        
-        if (endIndex && endIndex > 1) {
-          // Make sure the range is not empty
-          const startIndex = 1;
-          const safeEndIndex = endIndex - 1;
-          
-          if (safeEndIndex > startIndex) {
-            await this.docs.documents.batchUpdate({
-              documentId: docId,
-              requestBody: {
-                requests: [
-                  {
-                    deleteContentRange: {
-                      range: {
-                        startIndex: startIndex,
-                        endIndex: safeEndIndex
-                      }
-                    }
-                  }
-                ]
-              }
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error clearing Google Doc:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Convert Notion blocks to Google Docs API requests
    * 各ブロックごとに個別にbatchUpdateを実行する
    */
@@ -327,7 +282,7 @@ export class GoogleDocsService {
    * 各ブロックを処理し、即時にGoogle Docsを更新する
    */
   private async processBlock(block: NotionBlock, requests: any[], startIndex: number, docId: string): Promise<BlockProcessResult> {
-    const processBlockFn = await this.matchProcess(block);
+    const processBlockFn = await matchProcess(block);
 
     const updateBatch = docId ? async (requests: any[]) => {
       if (requests && requests.length > 0) {
@@ -338,37 +293,7 @@ export class GoogleDocsService {
     } : undefined;
 
     // ブロックを処理し、Google Docs APIリクエストを生成
-    return await processBlockFn(block, startIndex, this.extractTextFromRichText.bind(this), requests, updateBatch, this.docs, docId);
-  }
-
-  /**
-   * Process a single Notion block and convert it to Google Docs requests
-   */
-  private matchProcess(block: NotionBlock): BlockProcessFunction {
-    // ブロックのタイプに応じて処理を分岐
-    // 各ブロックタイプに対して、適切な処理関数を呼び出す
-    switch (block.type) {
-      case 'paragraph':
-        return processParagraphBlock;
-      case 'heading_1':
-      case 'heading_2':
-      case 'heading_3':
-        return processHeadingBlock;
-      case 'bulleted_list_item':
-      case 'numbered_list_item':
-      case 'to_do':
-        return processListBlock;
-      case 'quote':
-        return processQuoteBlock;
-      case 'code':
-        return processCodeBlock;
-      case 'divider':
-        return processDividerBlock;
-      case 'table':
-        return processTableBlock;
-      default:
-        return processUnsupportedBlock;
-    }
+    return await processBlockFn(block, startIndex, this.extractTextFromRichText.bind(this), requests, updateBatch, 0);
   }
 
   /**
@@ -639,6 +564,14 @@ export class GoogleDocsService {
    */
   private createDeleteContentRequests(startIndex: number, endIndex: number): any[] {  
     return [
+      {
+        deleteParagraphBullets: {
+          range: {
+            startIndex: startIndex,
+            endIndex: endIndex,
+          },
+        }
+      },
       {
         deleteContentRange: {
           range: {

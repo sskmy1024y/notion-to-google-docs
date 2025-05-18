@@ -77,6 +77,8 @@ export class NotionService {
       
       // Get page blocks
       const blocks = await this.getPageBlocks(pageId);
+
+      writeLog(`[Notion] getPage blocks: ${JSON.stringify(blocks, null, 2)}`);
       
       return {
         id: pageId,

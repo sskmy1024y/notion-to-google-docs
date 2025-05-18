@@ -208,12 +208,25 @@ export async function processTableBlock(
         }
       }
     }
-    
+        
     // バッチ更新が必要な場合は実行
     if (requests.length > 0) {
       requests = await updateBatch(requests);
     }
   }
+
+  // テーブルの終わりはインデックスを2つ分進める必要がある（テーブルの終わりと改行）
+  tableIndex += 2;
+
+  requests.push({
+    insertText: {
+      text: '\n',
+      location: { index: tableIndex }
+    }
+  });
+
+  tableIndex += 1; // 改行の分インデックスを進める
+  textLength = tableIndex - startIndex; // テーブルの長さを計算
 
   // テーブル全体の長さを返す
   return {

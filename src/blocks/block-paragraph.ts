@@ -1,11 +1,13 @@
 import { NotionBlock, BlockProcessResult, BlockProcessFunction } from '../types';
+import { processChildBlock } from './block-child';
 
-export const processParagraphBlock: BlockProcessFunction = (
+export const processParagraphBlock: BlockProcessFunction = async (
   block: NotionBlock,
   startIndex: number,
   extractTextFromRichText: (richText: any[]) => string,
   requests: any[] = [],
-  updateBatch?: (reqs: any[]) => Promise<any[]>
+  updateBatch?: (reqs: any[]) => Promise<any[]>,
+  depth: number = 0
 ) => {
   let text = extractTextFromRichText(block.paragraph?.rich_text || []);
   let textLength = 0;
@@ -18,13 +20,18 @@ export const processParagraphBlock: BlockProcessFunction = (
       },
     });
     textLength = text.length + 1;
-    
-    // updateBatchが提供され、特定の条件を満たす場合は即時更新することも可能
-    // 例：テキストが特定のサイズを超える場合など
-    // if (updateBatch && text.length > 1000) {
-    //   requests = await updateBatch(requests);
-    // }
   }
+
+  const processChildBlockResults = await processChildBlock(
+    block,
+    startIndex + textLength,
+    extractTextFromRichText,
+    requests,
+    updateBatch,
+    depth // 文字列の場合は自動でネストされるためそのまま渡す
+  );
+  requests = processChildBlockResults.requests;
+  textLength += processChildBlockResults.textLength;
   
   return { requests, textLength, updateImmediately: false };
 }

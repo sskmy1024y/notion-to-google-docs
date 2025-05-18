@@ -108,8 +108,7 @@ export type BlockProcessFunction = (
   extractTextFromRichText: (richText: any[]) => string,
   requests?: any[],
   updateBatch?: (reqs: any[]) => Promise<any[]>,
-  docsClient?: docs_v1.Docs,
-  docId?: string
+  depth?: number
 ) => MaybePromise<BlockProcessResult>;
 
 // Application types

@@ -2,7 +2,7 @@ import { matchProcess } from '.';
 import { NotionBlock, BlockProcessResult } from '../types';
 import { processChildBlock } from './block-child';
 
-export async function processListBlock(
+export async function processToggleBlock(
   block: NotionBlock,
   startIndex: number,
   extractTextFromRichText: (richText: any[]) => string,
@@ -15,15 +15,9 @@ export async function processListBlock(
   let shouldUpdateImmediately = false;
   const isChildBlock = depth > 0;
   
-  if (block.type === 'bulleted_list_item') {
-    text = extractTextFromRichText(block.bulleted_list_item?.rich_text || []);
-    bulletPreset = 'BULLET_DISC_CIRCLE_SQUARE';
-  } else if (block.type === 'numbered_list_item') {
-    text = extractTextFromRichText(block.numbered_list_item?.rich_text || []);
-    bulletPreset = 'NUMBERED_DECIMAL_ALPHA_ROMAN';
-  } else if (block.type === 'to_do') {
-    text = extractTextFromRichText(block.to_do?.rich_text || []);
-    bulletPreset = 'BULLET_CHECKBOX';
+  if (block.type === 'toggle') {
+    text = extractTextFromRichText(block.toggle?.rich_text || []);
+    bulletPreset = 'BULLET_ARROW_DIAMOND_DISC';
   }
   
   let textLength = 0;
@@ -33,6 +27,14 @@ export async function processListBlock(
         insertText: {
           location: { index: startIndex },
           text: text + '\n',
+        },
+      }, {
+        createParagraphBullets: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length,
+          },
+          bulletPreset,
         },
       }
     );
@@ -45,7 +47,7 @@ export async function processListBlock(
     extractTextFromRichText,
     requests,
     updateBatch,
-    depth + 1,
+    depth + 1
   );
   requests = processChildBlockResults.requests;
   textLength += processChildBlockResults.textLength;
@@ -55,14 +57,6 @@ export async function processListBlock(
       insertText: {
         location: { index: startIndex + textLength },
         text: '\n',
-      },
-    }, {
-      createParagraphBullets: {
-        range: {
-          startIndex: startIndex,
-          endIndex: startIndex + textLength,
-        },
-        bulletPreset,
       },
     })
     textLength += 1; // 改行を追加したので、テキスト長を更新
