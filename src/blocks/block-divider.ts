@@ -1,9 +1,9 @@
-import { NotionBlock } from '../types';
+import { NotionBlock, BlockProcessResult } from '../types';
 
 export function processDividerBlock(
   block: NotionBlock,
   startIndex: number
-): { requests: any[]; textLength: number } {
+): BlockProcessResult {
   return {
     requests: [
       {
@@ -14,5 +14,7 @@ export function processDividerBlock(
       },
     ],
     textLength: 4, // 3 dashes + newline
+    // 区切り線は文書構造を分ける重要な要素なので即時更新
+    updateImmediately: true
   };
 }

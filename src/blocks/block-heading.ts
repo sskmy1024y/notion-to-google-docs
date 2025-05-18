@@ -1,10 +1,10 @@
-import { NotionBlock } from '../types';
+import { NotionBlock, BlockProcessResult } from '../types';
 
 export function processHeadingBlock(
   block: NotionBlock,
   startIndex: number,
   extractTextFromRichText: (richText: any[]) => string
-): { requests: any[]; textLength: number } {
+): BlockProcessResult {
   let text = '';
   let style: 'HEADING_1' | 'HEADING_2' | 'HEADING_3' = 'HEADING_1';
   if (block.type === 'heading_1') {
@@ -42,5 +42,6 @@ export function processHeadingBlock(
     );
     textLength = text.length + 1;
   }
-  return { requests, textLength };
+  // 見出しは文書構造の重要な要素なので、即時更新する
+  return { requests, textLength, updateImmediately: true };
 }

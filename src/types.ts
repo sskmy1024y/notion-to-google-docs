@@ -2,6 +2,12 @@
 export interface NotionBlock {
   id: string;
   type: string;
+  child_blocks?: NotionBlock[];
+  has_children?: boolean;
+  in_trash?: boolean;
+  archived?: boolean;
+  created_time?: string;
+  last_edited_time?: string;
   [key: string]: any;
 }
 
@@ -55,6 +61,13 @@ export interface GoogleDocsResponse {
   };
   replies?: any[];
   updated?: boolean; // ページが更新されたかどうかを示すフラグ
+}
+
+// ブロック処理関数の戻り値の型
+export interface BlockProcessResult {
+  requests: any[];
+  textLength: number;
+  updateImmediately?: boolean;
 }
 
 // Application types

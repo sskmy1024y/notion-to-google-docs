@@ -100,7 +100,7 @@ export class GoogleDocsService {
         });
   
         // 同じ位置に新しいコンテンツを挿入
-        const insertRequests = this.convertNotionToGoogleDocs(notionPage, existingPageLocation.startIndex);
+        const insertRequests = await this.convertNotionToGoogleDocs(notionPage, existingPageLocation.startIndex, docId);
         
         writeLog(`[GoogleDocs] batchUpdate (insert) request: ${JSON.stringify(insertRequests, null, 2)}`);
         // 更新したコンテンツを書き込む
@@ -166,7 +166,7 @@ export class GoogleDocsService {
       }
       
       // Convert Notion blocks to Google Docs requests
-      const requests = this.convertNotionToGoogleDocs(notionPage, startIndex);
+      const requests = await this.convertNotionToGoogleDocs(notionPage, startIndex, docId);
       
       writeLog(`[GoogleDocs] batchUpdate (insert new) request: ${JSON.stringify(requests, null, 2)}`);
       // Write to Google Doc
@@ -243,9 +243,10 @@ export class GoogleDocsService {
 
   /**
    * Convert Notion blocks to Google Docs API requests
+   * 一部のブロックは即時に更新を行う
    */
-  private convertNotionToGoogleDocs(notionPage: NotionPage, startIndex: number): any[] {
-    const requests: any[] = [];
+  private async convertNotionToGoogleDocs(notionPage: NotionPage, startIndex: number, docId: string = GOOGLE_DOC_ID): Promise<any[]> {
+    let requests: any[] = [];
     
     // Add title
     requests.push(
@@ -338,21 +339,62 @@ export class GoogleDocsService {
       currentIndex += 1;
     }
     
-    // Process blocks
-    
-    for (const block of notionPage.blocks) {
-      const blockRequests = this.processBlock(block, currentIndex);
-      requests.push(...blockRequests.requests);
-      currentIndex += blockRequests.textLength;
+    // 1. タイトルやプロパティ情報など基本情報を最初に更新
+    if (requests.length > 0) {
+      writeLog(`[GoogleDocs] batchUpdate (basic info) request: ${JSON.stringify(requests, null, 2)}`);
+      await this.docs.documents.batchUpdate({
+        documentId: docId,
+        requestBody: { requests }
+      });
+      
+      // リクエスト配列をクリアする
+      requests = [];
     }
     
-    return requests;
+    // 2. blocksを処理し、必要に応じて即時更新を行う
+    let pendingRequests: any[] = [];
+    
+    // Process blocks
+    for (const block of notionPage.blocks) {
+      const blockResult = this.processBlock(block, currentIndex);
+      
+      // ブロックがupdateImmediatelyフラグを持っているかチェック
+      if (blockResult.updateImmediately) {
+        // 保留中のリクエストがあれば、まずそれらを処理
+        if (pendingRequests.length > 0) {
+          writeLog(`[GoogleDocs] batchUpdate (pending blocks) request: ${JSON.stringify(pendingRequests, null, 2)}`);
+          await this.docs.documents.batchUpdate({
+            documentId: docId,
+            requestBody: { requests: pendingRequests }
+          });
+          
+          // 処理後、配列をクリア
+          pendingRequests = [];
+        }
+        
+        // 次に、即時更新が必要なブロックを処理
+        writeLog(`[GoogleDocs] batchUpdate (immediate block) request: ${JSON.stringify(blockResult.requests, null, 2)}`);
+        await this.docs.documents.batchUpdate({
+          documentId: docId,
+          requestBody: { requests: blockResult.requests }
+        });
+      } else {
+        // 即時更新が不要なブロックの場合は、pendingRequestsに追加
+        pendingRequests.push(...blockResult.requests);
+      }
+      
+      // いずれにしても、インデックスは更新
+      currentIndex += blockResult.textLength;
+    }
+    
+    // 保留中のリクエストが残っていればそれを返す（後でbatchUpdateで処理するため）
+    return pendingRequests;
   }
 
   /**
    * Process a single Notion block and convert it to Google Docs requests
    */
-  private processBlock(block: NotionBlock, startIndex: number): { requests: any[], textLength: number } {
+  private processBlock(block: NotionBlock, startIndex: number): { requests: any[], textLength: number, updateImmediately?: boolean } {
     // ブロックタイプごとに外部関数に委譲
     switch (block.type) {
       case 'paragraph':

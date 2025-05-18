@@ -1,10 +1,10 @@
-import { NotionBlock } from '../types';
+import { NotionBlock, BlockProcessResult } from '../types';
 
 export function processCodeBlock(
   block: NotionBlock,
   startIndex: number,
   extractTextFromRichText: (richText: any[]) => string
-): { requests: any[]; textLength: number } {
+): BlockProcessResult {
   let text = extractTextFromRichText(block.code?.rich_text || []);
   const requests: any[] = [];
   let textLength = 0;
@@ -31,5 +31,6 @@ export function processCodeBlock(
     );
     textLength = text.length + 1;
   }
-  return { requests, textLength };
+  // コードブロックは特殊なフォーマットが必要なため、即時更新する
+  return { requests, textLength, updateImmediately: true };
 }

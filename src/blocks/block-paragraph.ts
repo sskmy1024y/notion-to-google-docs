@@ -1,10 +1,10 @@
-import { NotionBlock } from '../types';
+import { NotionBlock, BlockProcessResult } from '../types';
 
 export function processParagraphBlock(
   block: NotionBlock,
   startIndex: number,
   extractTextFromRichText: (richText: any[]) => string
-): { requests: any[]; textLength: number } {
+): BlockProcessResult {
   let text = extractTextFromRichText(block.paragraph?.rich_text || []);
   const requests: any[] = [];
   let textLength = 0;
@@ -17,6 +17,6 @@ export function processParagraphBlock(
     });
     textLength = text.length + 1;
   }
-  // 子ブロックの処理は親で行う
-  return { requests, textLength };
+  // 基本的にはすぐに更新する必要はない
+  return { requests, textLength, updateImmediately: false };
 }

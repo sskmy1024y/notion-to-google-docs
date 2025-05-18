@@ -1,10 +1,10 @@
-import { NotionBlock } from '../types';
+import { NotionBlock, BlockProcessResult } from '../types';
 
 export function processToDoBlock(
   block: NotionBlock,
   startIndex: number,
   extractTextFromRichText: (richText: any[]) => string
-): { requests: any[]; textLength: number } {
+): BlockProcessResult {
   let text = extractTextFromRichText(block.to_do?.rich_text || []);
   const requests: any[] = [];
   let textLength = 0;
@@ -17,5 +17,6 @@ export function processToDoBlock(
     });
     textLength = text.length + 3; // ☐+スペース+改行
   }
-  return { requests, textLength };
+  // 即時更新は不要
+  return { requests, textLength, updateImmediately: false };
 }

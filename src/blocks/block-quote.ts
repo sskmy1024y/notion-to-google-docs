@@ -1,10 +1,10 @@
-import { NotionBlock } from '../types';
+import { NotionBlock, BlockProcessResult } from '../types';
 
 export function processQuoteBlock(
   block: NotionBlock,
   startIndex: number,
   extractTextFromRichText: (richText: any[]) => string
-): { requests: any[]; textLength: number } {
+): BlockProcessResult {
   let text = extractTextFromRichText(block.quote?.rich_text || []);
   const requests: any[] = [];
   let textLength = 0;
@@ -32,5 +32,6 @@ export function processQuoteBlock(
     );
     textLength = text.length + 1;
   }
-  return { requests, textLength };
+  // 引用ブロックはインデントが必要ですが、即時更新は不要
+  return { requests, textLength, updateImmediately: false };
 }
