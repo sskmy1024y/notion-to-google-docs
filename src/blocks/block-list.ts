@@ -14,13 +14,12 @@ export async function processListBlock(
   if (block.type === 'bulleted_list_item') {
     text = extractTextFromRichText(block.bulleted_list_item?.rich_text || []);
     bulletPreset = 'BULLET_DISC_CIRCLE_SQUARE';
-    // 箇条書きリストは即時更新しなくても良い
-    shouldUpdateImmediately = false;
   } else if (block.type === 'numbered_list_item') {
     text = extractTextFromRichText(block.numbered_list_item?.rich_text || []);
-    bulletPreset = 'NUMBERED_DECIMAL';
-    // 番号付きリストは順序が重要なので即時更新する
-    shouldUpdateImmediately = true;
+    bulletPreset = 'NUMBERED_DECIMAL_ALPHA_ROMAN';
+  } else if (block.type === 'to_do') {
+    text = extractTextFromRichText(block.to_do?.rich_text || []);
+    bulletPreset = 'BULLET_CHECKBOX';
   }
   
   let textLength = 0;

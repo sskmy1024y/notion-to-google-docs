@@ -4,19 +4,15 @@ import {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_DOC_ID
 } from './config';
-import { NotionBlock, NotionPage, GoogleDocsRequest, GoogleDocsResponse, BlockProcessResult, BlockProcessFunction } from './types';
-import { createOAuth2Client, getGoogleAuthCredentials } from './google-auth';
-import { start } from 'repl';
+import { NotionBlock, NotionPage, GoogleDocsResponse, BlockProcessResult, BlockProcessFunction } from './types';
+import { getGoogleAuthCredentials } from './google-auth';
 import { processParagraphBlock } from './blocks/block-paragraph';
 import { processHeadingBlock } from './blocks/block-heading';
 import { processListBlock } from './blocks/block-list';
-import { processToDoBlock } from './blocks/block-todo';
 import { processQuoteBlock } from './blocks/block-quote';
 import { processCodeBlock } from './blocks/block-code';
 import { processDividerBlock } from './blocks/block-divider';
 import { processUnsupportedBlock } from './blocks/block-unsupported';
-import fs from 'fs';
-import path from 'path';
 import { processTableBlock } from './blocks/block-table';
 import { writeLog } from './log';
 
@@ -360,9 +356,8 @@ export class GoogleDocsService {
         return processHeadingBlock;
       case 'bulleted_list_item':
       case 'numbered_list_item':
-        return processListBlock;
       case 'to_do':
-        return processToDoBlock;
+        return processListBlock;
       case 'quote':
         return processQuoteBlock;
       case 'code':
