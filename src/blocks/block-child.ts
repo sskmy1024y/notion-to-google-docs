@@ -15,7 +15,7 @@ export async function processChildBlock(
   if (block.has_children && block.child_blocks && block.child_blocks.length > 0) {
     // 親リストアイテムの後に子要素を追加するので、開始インデックスをずらす
     let childStartIndex = startIndex + textLength;
-    const indent = '\t'.repeat(depth); // インデントを追加
+    const indent = '\t'; // インデントを追加
 
     for await (const childBlock of block.child_blocks) {
       const processFn = matchProcess(childBlock);

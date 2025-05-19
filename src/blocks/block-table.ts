@@ -1,6 +1,4 @@
-import { write } from 'fs';
 import { BlockProcessResult, NotionBlock, NotionTableBlock, NotionTableRowBlock, NotionText } from '../types';
-import { google, docs_v1 } from 'googleapis';
 import { writeLog } from '../log';
 
 /**
@@ -140,9 +138,6 @@ export async function processTableBlock(
           
           // テーブルインデックスを更新
           tableIndex += cellContent.length;
-        } else {
-          // 空のセルの場合でもインデックスを進める必要がある
-          tableIndex += 1;
         }
       }
     }
@@ -267,8 +262,11 @@ function createTextStyleRequest(startIndex: number, endIndex: number, annotation
   
   if (annotations.code) {
     // コードスタイルの場合は等幅フォントを使用
-    textStyle.fontFamily = 'Consolas';
-    fields.push('fontFamily');
+    textStyle.weightedFontFamily = {
+      fontFamily: 'Consolas',
+      weight: 400
+    };
+    fields.push('weightedFontFamily');
     
     // 背景色を設定してコードブロックっぽく
     textStyle.backgroundColor = {

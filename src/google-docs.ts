@@ -6,14 +6,6 @@ import {
 } from './config';
 import { NotionBlock, NotionPage, GoogleDocsResponse, BlockProcessResult, BlockProcessFunction } from './types';
 import { getGoogleAuthCredentials } from './google-auth';
-import { processParagraphBlock } from './blocks/block-paragraph';
-import { processHeadingBlock } from './blocks/block-heading';
-import { processListBlock } from './blocks/block-list';
-import { processQuoteBlock } from './blocks/block-quote';
-import { processCodeBlock } from './blocks/block-code';
-import { processDividerBlock } from './blocks/block-divider';
-import { processUnsupportedBlock } from './blocks/block-unsupported';
-import { processTableBlock } from './blocks/block-table';
 import { writeLog } from './log';
 import { matchProcess } from './blocks';
 

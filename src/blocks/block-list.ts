@@ -64,9 +64,37 @@ export async function processListBlock(
         },
         bulletPreset,
       },
-    })
-    textLength += 1; // 改行を追加したので、テキスト長を更新
+    }, {
+      insertText: {
+        location: { index: startIndex + textLength + 1 },
+        text: '\n',
+      },
+    }, {
+      deleteParagraphBullets: {
+        range: {
+          startIndex: startIndex,
+          endIndex: startIndex + textLength,
+        },
+      },
+    });
+    // WARNING: リストアイテムに変換した際に、タブがインデントに変換されてテキスト長が変わる
+    // 内部に含まれるインデント分のテキスト長を引く
+    const count = getIndentCount(block, depth);
+    console.log('count', count);
+    textLength -= count;
+
+    textLength += 2; // 改行を追加した分は加算
   }
   
   return { requests, textLength, updateImmediately: shouldUpdateImmediately };
+}
+
+const getIndentCount = (block: NotionBlock, depth: number = 0): number => {
+  if (block.has_children && block.child_blocks) {
+    const childrenCount = block.child_blocks.length;
+    const indent = '\t'.repeat(depth + 1);
+    const indentCount = childrenCount * indent.length;
+    return block.child_blocks.reduce((acc, child) => acc + getIndentCount(child, depth + 1), indentCount);
+  }
+  return 0;
 }
