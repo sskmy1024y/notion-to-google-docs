@@ -7,7 +7,7 @@ import path from 'path';
 import { validateConfig, NOTION_DATABASE_ID, GOOGLE_DOC_ID } from './config';
 import { NotionService } from './notion';
 import { GoogleDocsService } from './google-docs';
-import { TransferResult, MultiTransferResult } from './types';
+import { TransferResult, MultiTransferResult, NotionBlock } from './types';
 import { selectNotionPage, selectMultipleNotionPages } from './cli';
 import { db } from './database';
 
@@ -59,7 +59,7 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
     
     if (NOTION_DATABASE_ID) {
       console.log(`Notionデータベース(${NOTION_DATABASE_ID})からページのリストを取得しています...`);
-      const pages = await notionService.getDatabasePages();
+      const pages = await notionService.getDatabasePages(NOTION_DATABASE_ID);
       console.log(`${pages.length}個のページが見つかりました。`);
       
       // CLIで複数ページを選択
@@ -69,12 +69,28 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
     
     console.log(`Google Doc ID: ${GOOGLE_DOC_ID}`);
     
+    // 既に処理したページIDを追跡するためのセット
+    const processedPageIds = new Set<string>();
+    // 処理すべきページIDのキュー
+    const pageQueue = [...pageIds];
+
     // 各ページを処理
     const results: TransferResult[] = [];
     let successCount = 0;
     let failedCount = 0;
     
-    for (const pageId of pageIds) {
+    while (pageQueue.length > 0) {
+      const pageId = pageQueue.shift()!;
+      
+      // 既に処理済みのページはスキップ
+      if (processedPageIds.has(pageId)) {
+        console.log(`ページID ${pageId} は既に処理済みのためスキップします`);
+        continue;
+      }
+      
+      // 処理済みとしてマーク
+      processedPageIds.add(pageId);
+      
       try {
         console.log(`\n処理中のページID: ${pageId}`);
         
@@ -82,6 +98,32 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
         console.log('Notionページを取得中...');
         const notionPage = await notionService.getPage(pageId);
         console.log(`取得したNotionページ: "${notionPage.title}" (${notionPage.blocks.length}ブロック)`);
+
+        // child_databaseブロックを検索して処理
+        const childDatabases = findChildDatabases(notionPage.blocks);
+        if (childDatabases.length > 0) {
+          console.log(`このページには ${childDatabases.length} 個のchild_databaseブロックが含まれています`);
+          
+          for await (const dbBlock of childDatabases) {
+            const databaseId = dbBlock.id.replace(/-/g, '');
+            try {
+              console.log(`child_database ID ${databaseId} のview pageを取得中...`);
+              // データベースのページリストを取得
+              const dbPages = await notionService.getDatabasePages(databaseId);
+              console.log(`データベース内に ${dbPages.length} 個のページが見つかりました`);
+              
+              // 新しく見つかったページIDをキューに追加
+              for (const dbPage of dbPages) {
+                if (!processedPageIds.has(dbPage.id) && !pageQueue.includes(dbPage.id)) {
+                  console.log(`キューに新しいページを追加: "${dbPage.title}" (${dbPage.id})`);
+                  pageQueue.push(dbPage.id);
+                }
+              }
+            } catch (error) {
+              console.error(`child_database ID ${databaseId} の処理中にエラーが発生しました:`, error);
+            }
+          }
+        }
         
         // Write to Google Docs
         console.log('Google Docsに書き込み中...');
@@ -115,7 +157,7 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
     // 総合結果を返す
     return {
       success: failedCount === 0,
-      message: `${pageIds.length}個のページ処理が完了しました。成功: ${successCount}, 失敗: ${failedCount}`,
+      message: `${processedPageIds.size}個のページ処理が完了しました。成功: ${successCount}, 失敗: ${failedCount}`,
       results,
       successCount,
       failedCount
@@ -131,6 +173,31 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
       failedCount: 0
     };
   }
+}
+
+/**
+ * NotionBlockの配列から、child_databaseタイプのブロックを再帰的に検索して返す
+ * @param blocks - 検索対象のNotionBlockの配列
+ * @returns child_databaseタイプのブロックの配列
+ */
+function findChildDatabases(blocks: NotionBlock[]): NotionBlock[] {
+  const childDatabases: NotionBlock[] = [];
+  
+  // ブロック配列を再帰的に探索
+  for (const block of blocks) {
+    // child_databaseタイプのブロックを見つけた場合、結果に追加
+    if (block.type === 'child_database') {
+      childDatabases.push(block);
+    }
+    
+    // 子ブロックがある場合は、再帰的に検索
+    if (block.child_blocks && Array.isArray(block.child_blocks) && block.child_blocks.length > 0) {
+      const nestedChildDatabases = findChildDatabases(block.child_blocks);
+      childDatabases.push(...nestedChildDatabases);
+    }
+  }
+  
+  return childDatabases;
 }
 
 /**

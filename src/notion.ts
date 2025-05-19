@@ -1,4 +1,4 @@
-import { Client } from '@notionhq/client';
+import { Client, GetDatabaseResponse } from '@notionhq/client';
 import { NOTION_API_KEY, NOTION_DATABASE_ID } from './config';
 import { NotionBlock, NotionPage, NotionPageListItem, NotionTableBlock } from './types';
 import fs from 'fs';
@@ -25,7 +25,7 @@ export class NotionService {
   /**
    * データベースからページのリストを取得
    */
-  async getDatabasePages(databaseId: string = NOTION_DATABASE_ID): Promise<NotionPageListItem[]> {
+  async getDatabasePages(databaseId: string): Promise<NotionPageListItem[]> {
     try {
       writeLog(`[Notion] getDatabasePages request: ${databaseId}`);
       // データベースのページを取得
@@ -58,6 +58,24 @@ export class NotionService {
       return pages;
     } catch (error) {
       console.error('Error fetching database pages:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch a database from Notion by ID
+   */
+  async getDatabase(databaseId: string): Promise<GetDatabaseResponse> {
+    try {
+      writeLog(`[Notion] getDatabase request: ${databaseId}`);
+      const response = await this.client.databases.retrieve({
+        database_id: databaseId,
+      });
+      writeLog(`[Notion] getDatabase response: ${JSON.stringify(response, null, 2)}`);
+
+      return response;
+    } catch (error) {
+      console.error('Error fetching database:', error);
       throw error;
     }
   }

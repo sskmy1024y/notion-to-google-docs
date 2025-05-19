@@ -1,4 +1,5 @@
 import { BlockProcessFunction, NotionBlock } from "../types";
+import { processChildDatabaseBlock } from "./block-child";
 import { processCodeBlock } from "./block-code";
 import { processDividerBlock } from "./block-divider";
 import { processHeadingBlock } from "./block-heading";
@@ -36,6 +37,8 @@ import { processUnsupportedBlock } from "./block-unsupported";
         return processTableBlock;
       case 'toggle':
         return processToggleBlock;
+      case 'child_database':
+        return processChildDatabaseBlock;
       default:
         return processUnsupportedBlock;
     }

@@ -9,6 +9,13 @@ import { getGoogleAuthCredentials } from './google-auth';
 import { writeLog } from './log';
 import { matchProcess } from './blocks';
 
+/**
+ * NotionページIDからNotionページのURLを生成
+ */
+function getNotionPageUrl(pageId: string): string {
+  return `https://notion.so/${pageId.replace(/-/g, '')}`;
+}
+
 export class GoogleDocsService {
   private docs: docs_v1.Docs;
 
@@ -186,8 +193,9 @@ export class GoogleDocsService {
     );
     
     // ページIDをタイトルの後に追加
-    const pageIdText = `Notion Page ID: ${notionPage.id}\n`;
+    const pageIdText = `Notion Page ID: ${notionPage.id}`;
     const pageIdStartIndex = startIndex + notionPage.title.length + 1; // +1 for title newline
+    const notionPageUrl = getNotionPageUrl(notionPage.id);
     
     requests.push(
       {
@@ -202,7 +210,7 @@ export class GoogleDocsService {
         updateTextStyle: {
           range: {
             startIndex: pageIdStartIndex,
-            endIndex: pageIdStartIndex + pageIdText.length - 1 // -1 to exclude newline from style
+            endIndex: pageIdStartIndex + pageIdText.length
           },
           textStyle: {
             fontSize: {
@@ -217,9 +225,20 @@ export class GoogleDocsService {
                   blue: 0.5
                 }
               }
+            },
+            link: {
+              url: notionPageUrl
             }
           },
-          fields: 'fontSize,foregroundColor'
+          fields: 'fontSize,foregroundColor,link'
+        }
+      },
+      {
+        insertText: {
+          location: {
+            index: pageIdStartIndex + pageIdText.length
+          },
+          text: '\n'
         }
       }
     );
