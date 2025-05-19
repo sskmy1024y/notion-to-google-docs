@@ -62,12 +62,6 @@ export class GoogleDocsService {
       if (existingPageLocation) {
         writeLog(`[GoogleDocs] Updating existing Notion page: ${notionPage.id}`);
         console.log(`既存のNotionページID ${notionPage.id} を発見しました。更新します。`);
-       
-        // const adjustedEndIndex = this.adjustEndIndexForNewline(
-        //   existingPageLocation.startIndex,
-        //   existingPageLocation.endIndex,
-        //   document
-        // );
 
         // 既存のコンテンツを削除するリクエスト
         const deleteRequests = this.createDeleteContentRequests(
@@ -278,6 +272,16 @@ export class GoogleDocsService {
       requests = blockResult.requests;
     }
 
+    // 最後に改ページを追加
+    requests.push({
+      insertPageBreak: {
+        location: {
+          index: currentIndex
+        }
+      }
+    });
+    currentIndex += 1;
+
     // 最後に、全てのリクエストをまとめてGoogle Docsに送信
     if (requests.length > 0) {
       writeLog(`[GoogleDocs] batchUpdate (blocks) request: ${JSON.stringify(requests, null, 2)}`);
@@ -477,13 +481,10 @@ export class GoogleDocsService {
     }
     
     // このページIDの次のページIDまたはドキュメントの終わりまでを探す
-    // 次のページIDまたは改ページがこのページIDの終了を意味する
     const nextPageIdIndex = docText.indexOf('Notion Page ID:', pageIdIndex + searchPattern.length);
-    const nextPageBreak = docText.indexOf('\n\n\n', pageIdIndex + searchPattern.length);
-    
-    if (nextPageIdIndex !== -1 && (nextPageBreak === -1 || nextPageIdIndex < nextPageBreak)) {
+  
+    if (nextPageIdIndex !== -1) {
       // 次のページIDがある場合、そのページのタイトルの開始位置を取得
-      
       // タイトル検出のため、このページIDから次のページIDの間のテキストを探索
       let titleStartIndex = -1;
       let currentPos = 0;
