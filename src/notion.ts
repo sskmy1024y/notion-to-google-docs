@@ -3,6 +3,7 @@ import { NOTION_API_KEY, NOTION_DATABASE_ID } from './config';
 import { NotionBlock, NotionPage, NotionPageListItem, NotionTableBlock } from './types';
 import fs from 'fs';
 import path from 'path';
+import { db } from './database';
 
 const LOG_FILE = path.join(process.cwd(), 'debug.log');
 function writeLog(message: string) {
@@ -12,11 +13,13 @@ function writeLog(message: string) {
 
 export class NotionService {
   private client: Client;
+  private useCache: boolean;
 
-  constructor() {
+  constructor(useCache: boolean = true) {
     this.client = new Client({
       auth: NOTION_API_KEY,
     });
+    this.useCache = useCache;
   }
 
   /**
@@ -65,31 +68,66 @@ export class NotionService {
   async getPage(pageId: string): Promise<NotionPage> {
     try {
       writeLog(`[Notion] getPage request: ${pageId}`);
-      // Get page metadata
-      const page = await this.client.pages.retrieve({ page_id: pageId });
-      writeLog(`[Notion] getPage response: ${JSON.stringify(page, null, 2)}`);
       
-      // Get page title
-      const title = this.extractPageTitle(page);
+      // Always fetch the latest page metadata to check last_edited_time
+      const pageMetadata = await this.client.pages.retrieve({ page_id: pageId });
+      const lastEditedTime = (pageMetadata as any)['last_edited_time'] as string;
+      writeLog(`[Notion] getPage metadata fetched for: ${pageId}`);
       
-      // Extract page properties
-      const properties = this.extractPageProperties(page);
+      // Check cache if enabled
+      if (this.useCache) {
+        const cachedData = await db.getNotionPageFromCache(pageId);
+        
+        if (cachedData && cachedData.lastEditedTime === lastEditedTime) {
+          console.log(`[Notion] Using cached page data: ${pageId}`);
+          return cachedData.pageData;
+        }
+        
+        console.log(`[Notion] Cache miss or outdated, fetching page: ${pageId}`);
+      }
       
-      // Get page blocks
-      const blocks = await this.getPageBlocks(pageId);
-
-      writeLog(`[Notion] getPage blocks: ${JSON.stringify(blocks, null, 2)}`);
+      // Fetch full page data
+      const notionPage = await this.buildNotionPage(pageId, pageMetadata);
       
-      return {
-        id: pageId,
-        title,
-        properties,
-        blocks,
-      };
+      // Cache the result if caching is enabled
+      if (this.useCache) {
+        await db.cacheNotionPage(pageId, notionPage, lastEditedTime);
+      }
+      
+      return notionPage;
     } catch (error) {
       console.error('Error fetching Notion page:', error);
       throw error;
     }
+  }
+  
+  /**
+   * Build a complete NotionPage from metadata and blocks
+   */
+  private async buildNotionPage(pageId: string, pageMetadata: any): Promise<NotionPage> {
+    const title = this.extractPageTitle(pageMetadata);
+    const properties = this.extractPageProperties(pageMetadata);
+    const blocks = await this.getPageBlocks(pageId);
+    
+    writeLog(`[Notion] Page blocks fetched for: ${pageId}`);
+    
+    return {
+      id: pageId,
+      title,
+      properties,
+      blocks,
+    };
+  }
+
+  /**
+   * キャッシュをクリア
+   */
+  async clearCache(pageId?: string): Promise<void> {
+    await db.clearNotionPageCache(pageId);
+    console.log(pageId 
+      ? `[Notion] ページID ${pageId} のキャッシュをクリアしました`
+      : '[Notion] すべてのページキャッシュをクリアしました'
+    );
   }
 
   /**

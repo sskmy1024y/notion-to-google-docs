@@ -9,6 +9,7 @@ import { NotionService } from './notion';
 import { GoogleDocsService } from './google-docs';
 import { TransferResult, MultiTransferResult } from './types';
 import { selectNotionPage, selectMultipleNotionPages } from './cli';
+import { db } from './database';
 
 // ログファイルパス
 const LOG_FILE = path.join(process.cwd(), 'debug.log');
@@ -41,8 +42,13 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
     
     console.log('Starting transfer from Notion to Google Docs...');
     
+    // LowDBの初期化
+    console.log('キャッシュデータベースを初期化しています...');
+    await db.load();
+    
     // Initialize services
-    const notionService = new NotionService();
+    const notionService = new NotionService(true); // キャッシュ機能をオン
+    console.log('Notionサービスが初期化されました（キャッシュ機能: ON）');
     
     // 動的認証でGoogleDocsServiceを作成
     const googleDocsService = await GoogleDocsService.createWithDynamicAuth();
@@ -72,7 +78,7 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
       try {
         console.log(`\n処理中のページID: ${pageId}`);
         
-        // Fetch Notion page
+        // Fetch Notion page (キャッシュ機能が組み込まれている)
         console.log('Notionページを取得中...');
         const notionPage = await notionService.getPage(pageId);
         console.log(`取得したNotionページ: "${notionPage.title}" (${notionPage.blocks.length}ブロック)`);

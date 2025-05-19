@@ -25,12 +25,13 @@ export async function processCodeBlock(
             endIndex: startIndex + text.length,
           },
           textStyle: {
+            italic: true,
             weightedFontFamily: {
               weight: 400,
               fontFamily: 'Consolas',
             },
           },
-          fields: 'weightedFontFamily',
+          fields: 'weightedFontFamily, italic',
         },
       }
     );

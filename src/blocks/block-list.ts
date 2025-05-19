@@ -80,7 +80,6 @@ export async function processListBlock(
     // WARNING: リストアイテムに変換した際に、タブがインデントに変換されてテキスト長が変わる
     // 内部に含まれるインデント分のテキスト長を引く
     const count = getIndentCount(block, depth);
-    console.log('count', count);
     textLength -= count;
 
     textLength += 2; // 改行を追加した分は加算
