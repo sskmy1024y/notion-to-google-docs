@@ -7,6 +7,7 @@ dotenv.config({ path: resolve(process.cwd(), '.env') });
 // Notion configuration
 export const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
 export const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID || '';
+export const NOTION_PAGE_ID = process.env.NOTION_PAGE_ID || '';
 
 // Google API configuration
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -24,7 +25,7 @@ export function validateConfig(): void {
   ];
 
   // データベースモードかページモードどちらか一方が必要
-  if (!NOTION_DATABASE_ID) {
+  if (!NOTION_DATABASE_ID && !NOTION_PAGE_ID) {
     throw new Error('Either NOTION_DATABASE_ID or NOTION_PAGE_ID must be provided');
   }
 

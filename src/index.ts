@@ -4,12 +4,30 @@ console.log('Script starting...');
 
 import fs from 'fs';
 import path from 'path';
-import { validateConfig, NOTION_DATABASE_ID, GOOGLE_DOC_ID } from './config';
+import yargs from 'yargs/yargs';
+import { hideBin } from 'yargs/helpers';
+import { validateConfig, NOTION_DATABASE_ID, GOOGLE_DOC_ID, NOTION_PAGE_ID } from './config';
 import { NotionService } from './notion';
 import { GoogleDocsService } from './google-docs';
 import { TransferResult, MultiTransferResult, NotionBlock } from './types';
 import { selectNotionPage, selectMultipleNotionPages } from './cli';
 import { db } from './database';
+
+// コマンドライン引数の解析
+const argv = yargs(hideBin(process.argv))
+  .option('page', {
+    alias: 'p',
+    type: 'string',
+    description: 'Notion page ID to transfer directly'
+  })
+  .option('database', {
+    alias: 'd',
+    type: 'string',
+    description: 'Notion database ID to fetch pages from'
+  })
+  .help()
+  .alias('help', 'h')
+  .parseSync();
 
 // ログファイルパス
 const LOG_FILE = path.join(process.cwd(), 'debug.log');
@@ -57,14 +75,28 @@ async function transferMultipleNotionPagesToGoogleDocs(): Promise<MultiTransferR
     // ページIDのリストを取得
     let pageIds: string[] = [];
     
-    if (NOTION_DATABASE_ID) {
-      console.log(`Notionデータベース(${NOTION_DATABASE_ID})からページのリストを取得しています...`);
-      const pages = await notionService.getDatabasePages(NOTION_DATABASE_ID);
+    // コマンドライン引数からページID指定を優先的に使用
+    const directPageId = argv.page;
+    const directDatabaseId = argv.database || NOTION_DATABASE_ID;
+    
+    if (directPageId) {
+      console.log(`コマンドライン引数からページID（${directPageId}）を直接指定されました`);
+      pageIds = [directPageId];
+    } else if (NOTION_PAGE_ID) {
+      console.log(`環境変数からページID（${NOTION_PAGE_ID}）が指定されています`);
+      pageIds = [NOTION_PAGE_ID];
+    } else if (directDatabaseId) {
+      console.log(`Notionデータベース(${directDatabaseId})からページのリストを取得しています...`);
+      const pages = await notionService.getDatabasePages(directDatabaseId);
       console.log(`${pages.length}個のページが見つかりました。`);
       
       // CLIで複数ページを選択
       pageIds = await selectMultipleNotionPages(pages);
       console.log(`選択されたページ数: ${pageIds.length}`);
+    }
+    
+    if (pageIds.length === 0) {
+      throw new Error('転送するページが指定されていません。');
     }
     
     console.log(`Google Doc ID: ${GOOGLE_DOC_ID}`);

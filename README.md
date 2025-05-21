@@ -50,6 +50,9 @@ cp .env.example .env
 ```
 # Notion API credentials
 NOTION_API_KEY=your_notion_api_key
+# Notionデータベースから選択する場合
+NOTION_DATABASE_ID=your_notion_database_id
+# または特定のNotionページを直接指定する場合
 NOTION_PAGE_ID=your_notion_page_id
 
 # Google API credentials
@@ -87,16 +90,37 @@ Note: Previous versions required manually obtaining a refresh token using the OA
 
 ## Usage
 
-Run the script:
+### 基本的な使い方
+
+スクリプトを実行します:
 
 ```bash
 pnpm start
 ```
 
-This will:
-1. Fetch the content from the specified Notion page
-2. Convert the content to Google Docs format
-3. Write the content to the specified Google Docs document
+### コマンドラインオプション
+
+指定したNotionページIDを直接使用して転記する場合:
+
+```bash
+pnpm start --page YOUR_NOTION_PAGE_ID
+# または省略形
+pnpm start -p YOUR_NOTION_PAGE_ID
+```
+
+指定したNotionデータベースからページを選択する場合:
+
+```bash
+pnpm start --database YOUR_NOTION_DATABASE_ID
+# または省略形
+pnpm start -d YOUR_NOTION_DATABASE_ID
+```
+
+ヘルプを表示する:
+
+```bash
+pnpm start --help
+```
 
 ## Development
 
