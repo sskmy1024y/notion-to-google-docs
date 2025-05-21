@@ -84,6 +84,18 @@ export async function processListBlock(
           endIndex: startIndex + textLength + 1,
         },
       },
+    }, {
+      updateParagraphStyle: {
+        paragraphStyle: {
+          indentStart: { magnitude: 0, unit: 'PT' },
+          indentFirstLine: { magnitude: 0, unit: 'PT' },
+        },
+        range: {
+          startIndex: startIndex + textLength,
+          endIndex: startIndex + textLength + 1,
+        },
+        fields: 'indentStart,indentFirstLine',
+      },
     })
 
     textLength += 1; // 改行を追加した分は加算

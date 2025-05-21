@@ -32,11 +32,26 @@ export async function processQuoteBlock(
       }
     );
     textLength = text.length + 1;
-    
-    // 引用は通常は即時更新しないが、特定の条件でupdateBatchを呼び出すことも可能
-    // if (updateBatch && text.length > 500) {
-    //   requests = await updateBatch(requests);
-    // }
+
+    requests.push({
+      insertText: {
+        location: { index: startIndex + textLength },
+        text: text + '\n',
+      },
+    }, {
+      updateParagraphStyle: {
+        paragraphStyle: {
+          indentStart: { magnitude: 0, unit: 'PT' },
+          indentFirstLine: { magnitude: 0, unit: 'PT' },
+        },
+        range: {
+          startIndex: startIndex + textLength,
+          endIndex: startIndex + textLength + 1,
+        },
+        fields: 'indentStart,indentFirstLine',
+      },
+    });
+    textLength += 1;
   }
   // 引用ブロックはインデントが必要ですが、引き続き即時更新は不要
   return { requests, textLength, updateImmediately: false };

@@ -90,8 +90,70 @@ async function addDatabaseTableToDoc(
               ? new Date(property.last_edited_time).toLocaleDateString('ja-JP')
               : '';
             break;
+          case 'rollup':
+            if (property.rollup) {
+              switch (property.rollup.type) {
+                case 'array':
+                  // 配列の各要素から適切なテキストを抽出
+                  value = property.rollup.array?.map((item: any) => {
+                    if (item.type === 'title' && Array.isArray(item.title)) {
+                      return item.title.map((t: any) => t.plain_text).join('');
+                    } else if (item.type === 'rich_text' && Array.isArray(item.rich_text)) {
+                      return item.rich_text.map((t: any) => t.plain_text).join('');
+                    } else {
+                      return JSON.stringify(item);
+                    }
+                  }).join(', ') || '';
+                  break;
+                case 'number':
+                  value = property.rollup.number?.toString() || '';
+                  break;
+                case 'date':
+                  value = property.rollup.date?.start 
+                    ? new Date(property.rollup.date.start).toLocaleDateString('ja-JP')
+                    : '';
+                  break;
+                case 'string':
+                  value = property.rollup.string || '';
+                  break;
+                default:
+                  value = JSON.stringify(property.rollup);
+              }
+            }
+            break;
+          case 'formula':
+            if (property.formula) {
+              switch (property.formula.type) {
+                case 'string':
+                  value = property.formula.string || '';
+                  break;
+                case 'number':
+                  value = property.formula.number?.toString() || '';
+                  break;
+                case 'boolean':
+                  value = property.formula.boolean ? '✓' : '';
+                  break;
+                case 'date':
+                  value = property.formula.date?.start 
+                    ? new Date(property.formula.date.start).toLocaleDateString('ja-JP')
+                    : '';
+                  break;
+                default:
+                  value = `[formula: ${property.formula.type}]`;
+              }
+            }
+            break;
+          case 'relation':
+            value = property.relation?.map((r: any) => r.id).join(', ') || '';
+            break;
+          case 'people':
+            value = property.people?.map((p: any) => p.name || p.id).join(', ') || '';
+            break;
+          case 'files':
+            value = property.files?.map((f: any) => f.name || f.external?.url || '').join(', ') || '';
+            break;
           default:
-            value = 'N/A';
+            value = `[unknown type: ${property.type}]`;
         }
       }
       
@@ -275,7 +337,6 @@ export const processChildDatabaseBlock: BlockProcessFunction = async (
     });
     
     if (dbPages.length > 0) {
-      console.log(`データベース(${databaseId})のページ情報を取得しました:`, dbPages);
       // データベースの内容をマークダウンテーブルとして表示
       const tableLength = await addDatabaseTableToDoc(dbPages, startIndex + textLength, requests);
       textLength += tableLength;
