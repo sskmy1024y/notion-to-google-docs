@@ -1,5 +1,4 @@
 import { BlockProcessResult, NotionBlock, NotionTableBlock, NotionTableRowBlock, NotionText } from '../types';
-import { writeLog } from '../log';
 
 /**
  * テーブルブロックを処理する関数
@@ -93,7 +92,7 @@ export async function processTableBlock(
       for (let colIndex = 0; colIndex < columnCount; colIndex++) {
         // セルの開始インデックスを追加
         tableIndex += nextCellIndex;
-        writeLog(`テーブルのセルの開始インデックス: ${tableIndex}`);
+        console.log(`テーブルのセルの開始インデックス: ${tableIndex}`);
 
         // セル位置を記録
         cellPositions[rowIndex][colIndex] = tableIndex;

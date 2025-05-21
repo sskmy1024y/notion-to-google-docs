@@ -1,5 +1,5 @@
 import { BlockProcessFunction, NotionBlock } from "../types";
-import { processChildDatabaseBlock } from "./block-child";
+import { processChildDatabaseBlock } from "./block-child-database";
 import { processCodeBlock } from "./block-code";
 import { processDividerBlock } from "./block-divider";
 import { processHeadingBlock } from "./block-heading";
