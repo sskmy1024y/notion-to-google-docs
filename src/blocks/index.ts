@@ -6,6 +6,7 @@ import { processHeadingBlock } from "./block-heading";
 import { processListBlock } from "./block-list";
 import { processParagraphBlock } from "./block-paragraph";
 import { processQuoteBlock } from "./block-quote";
+import { processSyncedBlock } from "./block-synced";
 import { processTableBlock } from "./block-table";
 import { processToggleBlock } from "./block-toggle";
 import { processUnsupportedBlock } from "./block-unsupported";
@@ -39,6 +40,8 @@ import { processUnsupportedBlock } from "./block-unsupported";
         return processToggleBlock;
       case 'child_database':
         return processChildDatabaseBlock;
+      case 'synced_block':
+        return processSyncedBlock;
       default:
         return processUnsupportedBlock;
     }

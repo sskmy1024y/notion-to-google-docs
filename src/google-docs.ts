@@ -8,6 +8,7 @@ import { NotionBlock, NotionPage, GoogleDocsResponse, BlockProcessResult, BlockP
 import { getGoogleAuthCredentials } from './google-auth';
 import { matchProcess } from './blocks';
 import { writeLog } from './utils/logger';
+import { NotionService } from './notion';
 
 /**
  * NotionページIDからNotionページのURLを生成
@@ -18,30 +19,33 @@ function getNotionPageUrl(pageId: string): string {
 
 export class GoogleDocsService {
   private docs: docs_v1.Docs;
+  private notionService?: NotionService;
 
-  constructor(oauth2Client?: any) {
+  constructor(oauth2Client?: any, notionService?: NotionService) {
     // 既存のoauth2Clientが提供された場合はそれを使用
     if (oauth2Client) {
       this.docs = google.docs({ version: 'v1', auth: oauth2Client });
-      return;
+    } else {
+      // 提供されていない場合は、静的な認証情報を使用
+      const client = new google.auth.OAuth2(
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET,
+      );
+
+      // Create Google Docs client
+      this.docs = google.docs({ version: 'v1', auth: client });
     }
 
-    // 提供されていない場合は、静的な認証情報を使用
-    const client = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET,
-    );
-
-    // Create Google Docs client
-    this.docs = google.docs({ version: 'v1', auth: client });
+    // NotionServiceのインスタンスを保存
+    this.notionService = notionService;
   }
 
   /**
    * 動的な認証を使用してGoogleDocsServiceのインスタンスを作成
    */
-  static async createWithDynamicAuth(): Promise<GoogleDocsService> {
+  static async createWithDynamicAuth(notionService?: NotionService): Promise<GoogleDocsService> {
     const { oauth2Client } = await getGoogleAuthCredentials();
-    return new GoogleDocsService(oauth2Client);
+    return new GoogleDocsService(oauth2Client, notionService);
   }
 
   /**
@@ -297,7 +301,7 @@ export class GoogleDocsService {
    * 各ブロックを処理し、即時にGoogle Docsを更新する
    */
   private async processBlock(block: NotionBlock, requests: any[], startIndex: number, docId: string): Promise<BlockProcessResult> {
-    const processBlockFn = await matchProcess(block);
+    const processBlockFn = matchProcess(block);
 
     const updateBatch = docId ? async (requests: any[]) => {
       if (requests && requests.length > 0) {
@@ -306,6 +310,12 @@ export class GoogleDocsService {
       }
       return [];
     } : undefined;
+
+    // synced_blockの場合には、getPageBlocks関数をブロックに追加
+    if (block.type === 'synced_block' && this.notionService) {
+      // NotionServiceのgetPageBlocksメソッドへの参照を追加
+      (block as any).__getPageBlocks = this.notionService.getPageBlocks.bind(this.notionService);
+    }
 
     // ブロックを処理し、Google Docs APIリクエストを生成
     return await processBlockFn(block, startIndex, this.extractTextFromRichText.bind(this), requests, updateBatch, 0);

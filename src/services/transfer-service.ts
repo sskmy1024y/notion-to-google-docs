@@ -29,7 +29,7 @@ export async function transferMultipleNotionPagesToGoogleDocs(
     console.log('Notionサービスが初期化されました（キャッシュ機能: ON）');
     
     // 動的認証でGoogleDocsServiceを作成
-    const googleDocsService = await GoogleDocsService.createWithDynamicAuth();
+    const googleDocsService = await GoogleDocsService.createWithDynamicAuth(notionService);
     console.log('動的認証が完了しました。');
     
     // ページIDのリストを取得

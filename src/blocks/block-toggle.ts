@@ -38,12 +38,12 @@ export async function processToggleBlock(
         },
       }
     );
-    textLength = text.length + 1;
+    textLength = isChildBlock ? text.length : text.length + 1;
   }
   
   const processChildBlockResults = await processChildBlock(
     block,
-    startIndex + textLength,
+    startIndex + textLength - 1, // 先にcreateParagraphBulletsを追加しているので、-1する
     extractTextFromRichText,
     requests,
     updateBatch,

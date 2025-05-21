@@ -168,7 +168,7 @@ export class NotionService {
   /**
    * Get all blocks from a Notion page
    */
-  private async getPageBlocks(pageId: string): Promise<NotionBlock[]> {
+  public async getPageBlocks(pageId: string): Promise<NotionBlock[]> {
     const blocks: NotionBlock[] = [];
     let cursor: string | undefined;
     
