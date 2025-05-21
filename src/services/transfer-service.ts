@@ -1,4 +1,4 @@
-import { validateConfig, NOTION_DATABASE_ID, GOOGLE_DOC_ID, NOTION_PAGE_ID } from '../config';
+import { validateConfig, NOTION_DATABASE_ID, GOOGLE_DOC_ID, NOTION_PAGE_ID, FETCH_CHILD_DATABASES } from '../config';
 import { NotionService } from '../notion';
 import { GoogleDocsService } from '../google-docs';
 import { TransferResult, MultiTransferResult, NotionBlock } from '../types';
@@ -11,7 +11,8 @@ import { findChildDatabases } from '../utils/database-utils';
  */
 export async function transferMultipleNotionPagesToGoogleDocs(
   directPageId?: string, 
-  directDatabaseId?: string
+  directDatabaseId?: string,
+  fetchChildDatabases?: boolean
 ): Promise<MultiTransferResult> {
   try {
     // Validate environment variables
@@ -94,24 +95,33 @@ export async function transferMultipleNotionPagesToGoogleDocs(
         if (childDatabases.length > 0) {
           console.log(`このページには ${childDatabases.length} 個のchild_databaseブロックが含まれています`);
           
-          for await (const dbBlock of childDatabases) {
-            const databaseId = dbBlock.id.replace(/-/g, '');
-            try {
-              console.log(`child_database ID ${databaseId} のview pageを取得中...`);
-              // データベースのページリストを取得
-              const dbPages = await notionService.getDatabasePages(databaseId);
-              console.log(`データベース内に ${dbPages.length} 個のページが見つかりました`);
-              
-              // 新しく見つかったページIDをキューに追加
-              for (const dbPage of dbPages) {
-                if (!processedPageIds.has(dbPage.id) && !pageQueue.includes(dbPage.id)) {
-                  console.log(`キューに新しいページを追加: "${dbPage.title}" (${dbPage.id})`);
-                  pageQueue.push(dbPage.id);
+          // 環境変数または引数で指定された場合のみ処理する（デフォルトはfalse）
+          const shouldFetchChildDatabases = fetchChildDatabases ?? FETCH_CHILD_DATABASES;
+          
+          if (shouldFetchChildDatabases) {
+            console.log('child_databaseブロックの処理が有効になっています');
+            
+            for await (const dbBlock of childDatabases) {
+              const databaseId = dbBlock.id.replace(/-/g, '');
+              try {
+                console.log(`child_database ID ${databaseId} のview pageを取得中...`);
+                // データベースのページリストを取得
+                const dbPages = await notionService.getDatabasePages(databaseId);
+                console.log(`データベース内に ${dbPages.length} 個のページが見つかりました`);
+                
+                // 新しく見つかったページIDをキューに追加
+                for (const dbPage of dbPages) {
+                  if (!processedPageIds.has(dbPage.id) && !pageQueue.includes(dbPage.id)) {
+                    console.log(`キューに新しいページを追加: "${dbPage.title}" (${dbPage.id})`);
+                    pageQueue.push(dbPage.id);
+                  }
                 }
+              } catch (error) {
+                console.error(`child_database ID ${databaseId} の処理中にエラーが発生しました:`, error);
               }
-            } catch (error) {
-              console.error(`child_database ID ${databaseId} の処理中にエラーが発生しました:`, error);
             }
+          } else {
+            console.log('child_databaseブロックの処理はスキップされます（--fetch-child-db オプションで有効化できます）');
           }
         }
         

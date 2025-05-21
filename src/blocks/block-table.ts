@@ -92,7 +92,6 @@ export async function processTableBlock(
       for (let colIndex = 0; colIndex < columnCount; colIndex++) {
         // セルの開始インデックスを追加
         tableIndex += nextCellIndex;
-        console.log(`テーブルのセルの開始インデックス: ${tableIndex}`);
 
         // セル位置を記録
         cellPositions[rowIndex][colIndex] = tableIndex;

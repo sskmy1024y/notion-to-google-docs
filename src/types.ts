@@ -73,6 +73,7 @@ export interface NotionPageListItem {
   lastEditedTime?: string;
   createdTime?: string;
   url?: string;
+  properties?: { [key: string]: any };
 }
 
 // Google Docs types

@@ -46,6 +46,7 @@ export class NotionService {
           lastEditedTime: page.last_edited_time,
           createdTime: page.created_time,
           url: page.url,
+          properties: page.properties || {}
         };
       });
 

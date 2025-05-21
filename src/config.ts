@@ -8,6 +8,7 @@ dotenv.config({ path: resolve(process.cwd(), '.env') });
 export const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
 export const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID || '';
 export const NOTION_PAGE_ID = process.env.NOTION_PAGE_ID || '';
+export const FETCH_CHILD_DATABASES = process.env.FETCH_CHILD_DATABASES === 'true';
 
 // Google API configuration
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';

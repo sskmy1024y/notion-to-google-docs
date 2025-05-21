@@ -22,6 +22,12 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     description: 'Notion database ID to fetch pages from'
   })
+  .option('fetch-child-db', {
+    alias: 'f',
+    type: 'boolean',
+    description: 'Fetch and process child databases',
+    default: false
+  })
   .help()
   .alias('help', 'h')
   .parseSync();
@@ -34,7 +40,8 @@ const argv = yargs(hideBin(process.argv))
     // 複数ページ転送機能を使用
     const result = await transferMultipleNotionPagesToGoogleDocs(
       argv.page,
-      argv.database
+      argv.database,
+      argv['fetch-child-db']
     );
     
     if (result.success) {
@@ -43,8 +50,8 @@ const argv = yargs(hideBin(process.argv))
       // 各成功したページの詳細を表示
       result.results.filter(r => r.success).forEach(r => {
         console.log(`\n✓ ${r.message}`);
-        console.log(`  Notion Page: ${r.notionPageId}`);
-        console.log(`  Google Doc: ${r.googleDocId}`);
+        console.log(`  Notion Page: https://notion.so/${r.notionPageId}`);
+        console.log(`  Google Doc: https://docs.google.com/document/d/${r.googleDocId}/edit`);
       });
       
       // 失敗したページがあれば表示
