@@ -1,6 +1,7 @@
 import { BlockProcessFunction, NotionBlock } from "../types";
 import { processChildDatabaseBlock } from "./block-child-database";
 import { processCodeBlock } from "./block-code";
+import { processColumnListBlock } from "./block-column-list";
 import { processDividerBlock } from "./block-divider";
 import { processHeadingBlock } from "./block-heading";
 import { processListBlock } from "./block-list";
@@ -42,6 +43,8 @@ import { processUnsupportedBlock } from "./block-unsupported";
         return processChildDatabaseBlock;
       case 'synced_block':
         return processSyncedBlock;
+      case 'column_list':
+        return processColumnListBlock;
       default:
         return processUnsupportedBlock;
     }
